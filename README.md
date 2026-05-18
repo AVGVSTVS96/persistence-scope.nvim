@@ -22,7 +22,7 @@ review. They all collide on the same session file and clobber each other.
 
 `persistence-scope.nvim` fixes that by adding a **scope** to the session path.
 By default it uses the current tmux window name; each Neovim instance gets its
-own isolated session scoped to it's tmux window name for automatic persistence
+own isolated session scoped to its tmux window name for automatic persistence
 and restoration.
 
 ```text
@@ -193,7 +193,7 @@ no extra scope directory.
 | --- | --- | --- |
 | `"tmux_window_name"` *(default)* | `#{window_name}` | `tmux-api/` |
 | `"tmux_window_index"`       | `#{window_index}` | `tmux-window-2/` |
-| `"tmux_pane_id"`            | `#{pane_id}` | `tmux-pane-%17/` |
+| `"tmux_pane_id"`            | `#{pane_id}` | `tmux-pane-_17/` *(`%` is sanitized to `_`)* |
 | `"tmux_pane_index"`         | `#{pane_index}` | `tmux-pane-0/` |
 | `"tmux_session_window"`     | `#{session_name}:#{window_name}` | `tmux-work_api/` |
 
@@ -304,7 +304,7 @@ instead:
 {
   "avgvstvs96/persistence-scope.nvim",
   dependencies = { "folke/persistence.nvim" },
-  opts = { branch = true, need = 1, provider = "tmux_window" },
+  opts = { branch = true, need = 1, provider = "tmux_window_name" },
 }
 ```
 
