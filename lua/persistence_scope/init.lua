@@ -38,28 +38,95 @@ local function scope_from_file(file)
   return dir, label
 end
 
-local function preview_text(item)
-  local lines = {
-    "# Session",
-    "",
-    ("Path: `%s`"):format(item.file),
-    ("CWD: `%s`"):format(item.cwd or "unknown"),
-    ("Scope: `%s`"):format(item.scope_label or "global"),
-    ("Branch: `%s`"):format(item.branch or "none"),
-    ("Modified: `%s`"):format(os.date("%Y-%m-%d %H:%M:%S", item.mtime)),
-    "",
-    "Files:",
-  }
+local function home_alias(path)
+  if not path or path == "" then
+    return "unknown"
+  end
+  return vim.fn.fnamemodify(path, ":~")
+end
+
+local function cwd_relative(path, cwd)
+  local normalized_path = util.normalize(path)
+  local normalized_cwd = util.normalize(cwd)
+  if not normalized_path then
+    return path or "unknown"
+  end
+  if not normalized_cwd then
+    return home_alias(normalized_path)
+  end
+  if normalized_path == normalized_cwd then
+    return "."
+  end
+
+  local prefix = normalized_cwd .. "/"
+  if normalized_path:sub(1, #prefix) == prefix then
+    return normalized_path:sub(#prefix + 1)
+  end
+  return home_alias(normalized_path)
+end
+
+local function preview_line(lines, extmarks, text, marks)
+  lines[#lines + 1] = text
+  local row = #lines
+  for _, mark in ipairs(marks or {}) do
+    extmarks[#extmarks + 1] = {
+      row = row,
+      col = mark.col,
+      end_col = mark.end_col,
+      hl_group = mark.hl_group,
+      hl_mode = "replace",
+      priority = 200,
+    }
+  end
+end
+
+local function preview_field(lines, extmarks, label, value, hl_group)
+  value = tostring(value or "none")
+  local text = ("%-8s %s"):format(label, value)
+  preview_line(lines, extmarks, text, {
+    { col = 0, end_col = #label, hl_group = "SnacksPickerDimmed" },
+    { col = 9, end_col = #text, hl_group = hl_group },
+  })
+end
+
+local function preview_data(item)
+  local lines = {}
+  local extmarks = {}
+
+  preview_line(lines, extmarks, "# Session", {
+    { col = 0, end_col = 9, hl_group = "@markup.heading.1.markdown" },
+  })
+  preview_field(lines, extmarks, "Path", home_alias(item.file), "SnacksPickerComment")
+  preview_field(lines, extmarks, "CWD", home_alias(item.cwd), "SnacksPickerDirectory")
+  preview_field(lines, extmarks, "Scope", item.scope_label or "global", "SnacksPickerSpecial")
+  preview_field(lines, extmarks, "Branch", item.branch or "none", item.branch and "SnacksPickerGitBranch" or "SnacksPickerComment")
+  preview_field(lines, extmarks, "Modified", os.date("%Y-%m-%d %H:%M:%S", item.mtime), "SnacksPickerTime")
+  preview_line(lines, extmarks, "")
+  local files_title = ("## Files (%d)"):format(#item.buffers)
+  preview_line(lines, extmarks, files_title, {
+    { col = 0, end_col = #files_title, hl_group = "@markup.heading.2.markdown" },
+  })
 
   if #item.buffers == 0 then
-    lines[#lines + 1] = "- none parsed"
+    preview_line(lines, extmarks, "  none parsed", {
+      { col = 2, end_col = 13, hl_group = "SnacksPickerComment" },
+    })
   else
     for _, file in ipairs(item.buffers) do
-      lines[#lines + 1] = "- `" .. file .. "`"
+      local path = cwd_relative(file, item.cwd)
+      local text = "- " .. path
+      preview_line(lines, extmarks, text, {
+        { col = 2, end_col = #text, hl_group = "SnacksPickerFile" },
+      })
     end
   end
 
-  return table.concat(lines, "\n")
+  return {
+    text = table.concat(lines, "\n"),
+    ft = "markdown",
+    extmarks = extmarks,
+    loc = false,
+  }
 end
 
 local function item_from_file(file)
@@ -96,11 +163,7 @@ local function item_from_file(file)
     item.buffer_summary,
     table.concat(item.buffers, " "),
   }, " ")
-  item.preview = {
-    text = preview_text(item),
-    ft = "markdown",
-    loc = false,
-  }
+  item.preview = preview_data(item)
 
   return item
 end
