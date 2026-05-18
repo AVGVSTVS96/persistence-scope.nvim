@@ -85,7 +85,7 @@ CONFIGURATION                         *persistence-scope-configuration*
 Defaults:
 >
   require("persistence_scope").setup({
-    provider = "tmux_window",
+    provider = "tmux_window_name",
     picker = "auto",
     base_dir = vim.fn.stdpath("state") .. "/sessions/",
     branch = true,
@@ -100,7 +100,7 @@ provider                                      *persistence-scope-provider-option
 
 The scope used to choose the session directory.
 >
-  provider = "tmux_window"
+  provider = "tmux_window_name"
 <
 
 ------------------------------------------------------------------------------
@@ -167,7 +167,6 @@ PROVIDERS                                     *persistence-scope-providers*
 
 Built-in providers:
 >
-  "tmux_window"
   "tmux_window_name"
   "tmux_window_index"
   "tmux_pane_id"

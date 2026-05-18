@@ -83,7 +83,7 @@ With [`lazy.nvim`](https://github.com/folke/lazy.nvim):
   },
   lazy = false, -- load eagerly so sessions restore on startup
   opts = {
-    provider = "tmux_window",
+    provider = "tmux_window_name",
   },
   keys = {
     { "<leader>qr", function() require("persistence_scope").restore() end, desc = "Restore session" },
@@ -148,7 +148,7 @@ Defaults — pass any subset to `opts`:
 require("persistence_scope").setup({
   -- Scope used to choose the session directory.
   -- Built-in providers (see below) or a custom function.
-  provider = "tmux_window",
+  provider = "tmux_window_name",
 
   -- Picker used by `select()` and ambiguous restores.
   --   "auto"    → Snacks when available, otherwise vim.ui.select
@@ -182,7 +182,7 @@ A provider is just a function that returns a **scope table** (or `nil`):
 
 ```lua
 {
-  kind  = "tmux_window",  -- identifier for the provider
+  kind  = "tmux_window_name", -- identifier for the provider
   label = "api",          -- human-readable label shown in the picker
   dir   = "tmux-api",     -- directory name appended to base_dir
   meta  = { ... },        -- arbitrary extra info
@@ -196,8 +196,7 @@ no extra scope directory.
 
 | Provider | Scope label source | Example dir |
 | --- | --- | --- |
-| `"tmux_window"` *(default)* | `#{window_name}` | `tmux-api/` |
-| `"tmux_window_name"`        | `#{window_name}` | `tmux-api/` |
+| `"tmux_window_name"` *(default)* | `#{window_name}` | `tmux-api/` |
 | `"tmux_window_index"`       | `#{window_index}` | `tmux-window-2/` |
 | `"tmux_pane_id"`            | `#{pane_id}` | `tmux-pane-%17/` |
 | `"tmux_pane_index"`         | `#{pane_index}` | `tmux-pane-0/` |
@@ -246,7 +245,7 @@ sourced.
 ### Scope by tmux window name (default)
 
 ```lua
-require("persistence_scope").setup({ provider = "tmux_window" })
+require("persistence_scope").setup({ provider = "tmux_window_name" })
 ```
 
 ### Scope by tmux pane id (truly per-pane sessions)

@@ -3,7 +3,6 @@ local M = {}
 local tmux = require("persistence_scope.providers.tmux")
 
 local providers = {
-  tmux_window = tmux.window_name,
   tmux_window_name = tmux.window_name,
   tmux_window_index = tmux.window_index,
   tmux_pane_id = tmux.pane_id,
@@ -16,7 +15,7 @@ function M.resolve(provider)
     return provider()
   end
 
-  local fn = providers[provider or "tmux_window"]
+  local fn = providers[provider or "tmux_window_name"]
   if not fn then
     vim.notify(("Unknown persistence-scope provider: %s"):format(provider), vim.log.levels.WARN)
     return nil

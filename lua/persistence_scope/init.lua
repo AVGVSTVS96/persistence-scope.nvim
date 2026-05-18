@@ -5,7 +5,7 @@ local util = require("persistence_scope.util")
 local M = {}
 
 M.config = {
-  provider = "tmux_window",
+  provider = "tmux_window_name",
   picker = "auto",
   base_dir = vim.fn.stdpath("state") .. "/sessions/",
   branch = true,

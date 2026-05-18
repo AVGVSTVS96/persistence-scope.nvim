@@ -35,7 +35,7 @@ end
 
 function M.window_name()
   local label = display("#{window_name}")
-  return scope("tmux_window", label, "tmux-", {
+  return scope("tmux_window_name", label, "tmux-", {
     window_name = label,
   })
 end
