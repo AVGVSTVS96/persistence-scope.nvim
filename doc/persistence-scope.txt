@@ -1,0 +1,209 @@
+*persistence-scope.nvim* Scoped sessions for persistence.nvim
+
+==============================================================================
+CONTENTS                                      *persistence-scope-contents*
+
+1. Overview                                  |persistence-scope-overview|
+2. Requirements                              |persistence-scope-requirements|
+3. Installation                              |persistence-scope-installation|
+4. Commands                                  |persistence-scope-commands|
+5. Lua API                                   |persistence-scope-api|
+6. Configuration                             |persistence-scope-configuration|
+7. Providers                                 |persistence-scope-providers|
+8. Restore Behavior                          |persistence-scope-restore|
+
+==============================================================================
+OVERVIEW                                      *persistence-scope-overview*
+
+persistence-scope.nvim lets one working directory have multiple independent
+persistence.nvim sessions by saving each session under a scope. The default
+scope is the current tmux window name.
+
+Example:
+>
+  ~/.local/state/nvim/sessions/
+    tmux-api/%home%me%project.vim
+    tmux-ui/%home%me%project.vim
+<
+
+This is useful when you keep several Neovim instances open in the same
+repository for different threads of work.
+
+==============================================================================
+REQUIREMENTS                              *persistence-scope-requirements*
+
+- Neovim 0.10+
+- folke/persistence.nvim
+- folke/snacks.nvim, optional, for the rich picker
+- tmux, optional, for the built-in tmux providers
+
+==============================================================================
+INSTALLATION                              *persistence-scope-installation*
+
+With lazy.nvim:
+>
+  {
+    "avgvstvs96/persistence-scope.nvim",
+    dependencies = {
+      "folke/persistence.nvim",
+      "folke/snacks.nvim",
+    },
+    lazy = false,
+    opts = {},
+  }
+<
+
+persistence-scope.nvim calls require("persistence").setup() for you. If you
+currently have a separate persistence.nvim setup block, move those options into
+this plugin's opts.
+
+==============================================================================
+COMMANDS                                       *persistence-scope-commands*
+
+                                                        *:PersistenceScopeRestore*
+:PersistenceScopeRestore
+    Restore the best matching session for the current working directory and
+    current scope.
+
+                                                         *:PersistenceScopeSelect*
+:PersistenceScopeSelect
+    Open the session picker.
+
+==============================================================================
+LUA API                                             *persistence-scope-api*
+
+>
+  require("persistence_scope").restore()
+  require("persistence_scope").select()
+  require("persistence_scope").sessions()
+  require("persistence_scope").load_file(path)
+<
+
+==============================================================================
+CONFIGURATION                         *persistence-scope-configuration*
+
+Defaults:
+>
+  require("persistence_scope").setup({
+    provider = "tmux_window",
+    picker = "auto",
+    base_dir = vim.fn.stdpath("state") .. "/sessions/",
+    branch = true,
+    recent_seconds = 4 * 60 * 60,
+    patch_persistence = true,
+    snacks = {},
+  })
+<
+
+------------------------------------------------------------------------------
+provider                                      *persistence-scope-provider-option*
+
+The scope used to choose the session directory.
+>
+  provider = "tmux_window"
+<
+
+------------------------------------------------------------------------------
+picker                                          *persistence-scope-picker-option*
+
+Picker used by select() and ambiguous restores.
+>
+  picker = "auto"    -- Snacks when available, otherwise vim.ui.select
+  picker = "snacks"
+  picker = "vim_ui"
+<
+
+The Snacks picker shows age, scope, cwd, branch, buffer summary, and a preview.
+
+------------------------------------------------------------------------------
+base_dir                                      *persistence-scope-base-dir-option*
+
+Base directory for all session files.
+>
+  base_dir = vim.fn.stdpath("state") .. "/sessions/"
+<
+
+------------------------------------------------------------------------------
+branch                                        *persistence-scope-branch-option*
+
+Passed to persistence.nvim. When enabled, non-main branches get separate
+session files.
+>
+  branch = true
+<
+
+------------------------------------------------------------------------------
+recent_seconds                        *persistence-scope-recent-seconds-option*
+
+When more than one session for the current cwd and scope was modified recently,
+restore opens the picker instead of guessing.
+>
+  recent_seconds = 4 * 60 * 60
+<
+
+------------------------------------------------------------------------------
+patch_persistence                    *persistence-scope-patch-persistence-option*
+
+Adds compatibility helpers to require("persistence"):
+>
+  require("persistence").load_tmux_fallback()
+  require("persistence").select()
+  require("persistence").load_file(path)
+  require("persistence").session_items()
+<
+
+------------------------------------------------------------------------------
+snacks                                        *persistence-scope-snacks-option*
+
+Extra options passed to the Snacks picker.
+>
+  snacks = {
+    -- any Snacks.picker option
+  }
+<
+
+==============================================================================
+PROVIDERS                                     *persistence-scope-providers*
+
+Built-in providers:
+>
+  "tmux_window"
+  "tmux_window_name"
+  "tmux_window_index"
+  "tmux_pane_id"
+  "tmux_pane_index"
+  "tmux_session_window"
+<
+
+Custom providers return a scope table:
+>
+  provider = function()
+    return {
+      kind = "custom",
+      label = "my-scope",
+      dir = "custom-my-scope",
+      meta = {},
+    }
+  end
+<
+
+If a provider returns nil, sessions are saved in base_dir without an extra
+scope directory.
+
+==============================================================================
+RESTORE BEHAVIOR                            *persistence-scope-restore*
+
+:PersistenceScopeRestore uses this order:
+
+1. Find sessions for the current working directory.
+2. Prefer sessions in the current scope.
+3. If more than one current-scope session was modified within recent_seconds,
+   open the picker.
+4. Otherwise load the newest current-scope session.
+5. If no current-scope session exists, open a picker for the current working
+   directory across all scopes.
+6. Outside a resolved scope, load the only current-directory session or ask when
+   there are multiple.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
