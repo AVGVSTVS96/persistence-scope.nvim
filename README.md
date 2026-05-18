@@ -35,6 +35,9 @@ and restoration.
     └── %home%me%project.vim
 ```
 
+> Sessions are still written by `folke/persistence.nvim` — this plugin only
+> redirects them into a per-scope subdirectory and adds a smarter picker on top.
+
 > Not a tmux user? Bring your own scope — any Lua function works (see [Custom providers](#custom-providers)).
 
 ## 📚 Contents
@@ -49,6 +52,7 @@ and restoration.
 - [Providers](#-providers)
 - [Restore Behavior](#-restore-behavior)
 - [Examples](#-examples)
+- [Troubleshooting](#-troubleshooting)
 - [FAQ](#-faq)
 - [Acknowledgements](#-acknowledgements)
 - [License](#-license)
@@ -93,10 +97,32 @@ With [`lazy.nvim`](https://github.com/folke/lazy.nvim):
 }
 ```
 
+With Neovim's native package manager (`vim.pack`, Neovim `>= 0.12`):
+
+```lua
+vim.pack.add({
+  { src = "https://github.com/folke/persistence.nvim" },
+  { src = "https://github.com/folke/snacks.nvim" }, -- optional, for the rich picker
+  { src = "https://github.com/avgvstvs96/persistence-scope.nvim" },
+})
+
+require("persistence_scope").setup({
+  provider = "tmux_window_name",
+})
+
+vim.keymap.set("n", "<leader>qr", function()
+  require("persistence_scope").restore()
+end, { desc = "Restore session" })
+
+vim.keymap.set("n", "<leader>qs", function()
+  require("persistence_scope").select()
+end, { desc = "Select session" })
+```
+
 >[!IMPORTANT]
 >`persistence-scope.nvim` calls `require("persistence").setup()` for you.
 > If you already configure `persistence.nvim` separately, move those options
-> into this plugin's `opts` and remove the standalone setup call.
+> into this plugin's `opts` / `setup()` call and remove the standalone setup call.
 
 ## ⚡ Quick Start
 
@@ -145,8 +171,8 @@ Defaults — pass any subset to `opts`:
 
 ```lua
 require("persistence_scope").setup({
-  -- Scope used to choose the session directory.
-  -- Built-in providers (see below) or a custom function.
+  -- Scope used to choose the session directory. Either the name of a
+  -- built-in provider (see below) or a function returning a scope table.
   provider = "tmux_window_name",
 
   -- Picker used by `select()` and ambiguous restores.
@@ -155,12 +181,17 @@ require("persistence_scope").setup({
   --   "vim_ui"  → force vim.ui.select
   picker = "auto",
 
-  -- Base directory for all session files.
+  -- Base directory for all session files. The current scope's directory
+  -- is appended to this for the actual save location.
   base_dir = vim.fn.stdpath("state") .. "/sessions/",
 
   -- Forwarded to persistence.nvim. When true, non-main branches get
   -- their own session files.
   branch = true,
+
+  -- Forwarded to persistence.nvim. Minimum file buffers required for
+  -- autosave. `nil` uses the upstream default (1). Set to 0 to always save.
+  need = nil,
 
   -- If more than one current-scope session was modified within this
   -- window of time, restore opens the picker instead of guessing.
@@ -170,6 +201,9 @@ require("persistence_scope").setup({
   snacks = {},
 })
 ```
+
+All options are optional — `require("persistence_scope").setup()` with no
+arguments works fine and uses the defaults shown above.
 
 ## 🔌 Providers
 
@@ -234,6 +268,20 @@ require("persistence_scope").setup({
 
 If nothing matches at all, you get a friendly `vim.notify` and no session is
 sourced.
+
+## 🩺 Troubleshooting
+
+Run `:checkhealth persistence_scope` — it reports your Neovim version, whether
+`persistence.nvim` / `snacks.nvim` are installed, the resolved scope, where
+sessions are being saved, and how many session files already exist.
+
+If scoping doesn't seem to be working:
+
+1. Confirm `:checkhealth` shows a non-`global` scope.
+2. Make sure nothing else in your config calls `require("persistence").setup()`
+   *after* this plugin loads (see the FAQ entry below).
+3. Check `:lua = require("persistence_scope").config.base_dir` and inspect the
+   subdirectories there.
 
 ## 🧪 Examples
 
