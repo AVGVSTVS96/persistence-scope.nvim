@@ -15,14 +15,15 @@
 
 ## ✨ Why?
 
-`persistence.nvim` saves one session per `cwd` (+ branch). That's perfect — until
+`persistence.nvim` saves one session per `cwd` (+ branch). That's perfect, until
 you keep **several Neovim instances open in the same repo** for different threads
 of work: one tmux window for the API, another for the UI, another for a code
 review. They all collide on the same session file and clobber each other.
 
-`persistence-scope.nvim` fixes that by adding a **scope** to the session path —
-typically the current tmux window — so each instance gets its own isolated
-session, restored automatically on the next launch.
+`persistence-scope.nvim` fixes that by adding a **scope** to the session path.
+By default it uses the current tmux window name; each Neovim instance gets its
+own isolated session scoped to it's tmux window name for automatic persistence
+and restoration.
 
 ```text
 ~/.local/state/nvim/sessions/
@@ -54,21 +55,21 @@ session, restored automatically on the next launch.
 
 ## 🚀 Features
 
-- 🪟 **Per-tmux-window sessions** out of the box — name your windows, get named workspaces.
-- 🔌 **Pluggable scopes** — pane id, pane index, session+window, or a custom Lua function.
+- 🪟 **Per-tmux-window sessions** out of the box - name your windows, get named workspaces.
+- 🔌 **Pluggable scopes** - pane id, pane index, session+window, or a custom Lua function.
 - 🍿 **Rich Snacks picker** with age, scope, branch, buffer summary, and a preview.
 - 🪶 **Falls back gracefully** to `vim.ui.select` when Snacks isn't installed.
 - 🤝 **Drop-in compatible** with existing `persistence.nvim` keymaps and dashboards.
-- 🧠 **Smart restore** — picks the best match for your cwd + scope, or asks when it's ambiguous.
+- 🧠 **Smart restore** picks the best match for your cwd + scope, or asks when it's ambiguous.
 
 ## ✅ Requirements
 
 | Requirement | Notes |
 | --- | --- |
 | Neovim `>= 0.10` | Uses `vim.uv` / `vim.fs.normalize`. |
-| [`folke/persistence.nvim`](https://github.com/folke/persistence.nvim) | Required — used as the session backend. |
-| [`folke/snacks.nvim`](https://github.com/folke/snacks.nvim) | Optional — enables the rich picker. |
-| `tmux` | Optional — only needed for the built-in tmux providers. |
+| [`folke/persistence.nvim`](https://github.com/folke/persistence.nvim) | Required: used as the session backend. |
+| [`folke/snacks.nvim`](https://github.com/folke/snacks.nvim) | Optional: enables the rich picker. |
+| `tmux` | Optional: only needed for the built-in tmux providers. |
 
 ## 📦 Installation
 
@@ -92,7 +93,8 @@ With [`lazy.nvim`](https://github.com/folke/lazy.nvim):
 }
 ```
 
-> ⚠️ `persistence-scope.nvim` calls `require("persistence").setup()` for you.
+>[!IMPORTANT]
+>`persistence-scope.nvim` calls `require("persistence").setup()` for you.
 > If you already configure `persistence.nvim` separately, move those options
 > into this plugin's `opts` and remove the standalone setup call.
 
@@ -109,7 +111,7 @@ With [`lazy.nvim`](https://github.com/folke/lazy.nvim):
 3. Re-open Neovim from the same window — your session restores automatically
    via `:PersistenceScopeRestore` (or trigger it from a dashboard / keymap).
 
-That's it. Each window in each project now has its own independent session.
+That's it. Each tmux window now gets its own isolated neovim session, even when there are multiple instances of the same project CWD.
 
 ## 🧭 Commands
 
@@ -129,15 +131,12 @@ ps.sessions(opts)            -- list session items (filter by { cwd, scope_dir }
 ps.load_file(path)           -- source a session file and fire persistence events
 ```
 
-When [`patch_persistence`](#patch_persistence) is enabled (default), the same
-helpers are mirrored onto `require("persistence")`, so any code already wired to
-`persistence.nvim` works unchanged:
+This plugin also wires itself into `require("persistence")` so existing
+keymaps and dashboards benefit from scoping with no code changes:
 
 ```lua
-require("persistence").load_tmux_fallback() -- alias for ps.restore()
-require("persistence").select()             -- alias for ps.select()
-require("persistence").load_file(path)
-require("persistence").session_items()
+require("persistence").select()        -- upgraded to the scope-aware picker
+require("persistence").load_file(path) -- added: source a specific session file
 ```
 
 ## ⚙️ Configuration
@@ -166,10 +165,6 @@ require("persistence_scope").setup({
   -- If more than one current-scope session was modified within this
   -- window of time, restore opens the picker instead of guessing.
   recent_seconds = 4 * 60 * 60,
-
-  -- Mirror this plugin's helpers onto `require("persistence")` so existing
-  -- keymaps/dashboards keep working unchanged.
-  patch_persistence = true,
 
   -- Extra options forwarded to the Snacks picker.
   snacks = {},
@@ -260,12 +255,6 @@ require("persistence_scope").setup({ provider = "tmux_pane_id" })
 require("persistence_scope").setup({ picker = "vim_ui" })
 ```
 
-### Disable compatibility patching
-
-```lua
-require("persistence_scope").setup({ patch_persistence = false })
-```
-
 ### Custom Snacks picker options
 
 ```lua
@@ -291,16 +280,57 @@ var, the GUI window title, etc.
 <details>
 <summary><b>Do I still need to call <code>require("persistence").setup()</code>?</b></summary>
 
-No. `persistence-scope.nvim` calls it for you with the correct `dir` and
-`branch`. Move any extra persistence options into this plugin's `opts`.
+No — and you should actively **remove** any existing call. `persistence-scope.nvim`
+calls `require("persistence").setup()` for you with the correct `dir` and
+`branch`. If anything else in your config calls `setup()` afterwards, it will
+overwrite `dir` and silently break scoping (all sessions land back in the
+shared default directory).
+
+Concretely, make sure none of the following exist in your config:
+
+- A standalone `require("persistence").setup({ ... })` call in your init.lua.
+- A separate lazy.nvim spec like `{ "folke/persistence.nvim", opts = {...} }`
+  — lazy will call `setup()` on it. Keep persistence.nvim *only* as a
+  dependency of `persistence-scope.nvim`, as shown in [Installation](#-installation).
+
+Move any options you were passing to persistence.nvim into this plugin's `opts`
+instead:
+
+```lua
+-- ❌ Before
+{ "folke/persistence.nvim", opts = { branch = true, need = 1 } }
+
+-- ✅ After
+{
+  "avgvstvs96/persistence-scope.nvim",
+  dependencies = { "folke/persistence.nvim" },
+  opts = { branch = true, need = 1, provider = "tmux_window" },
+}
+```
 
 </details>
 
 <details>
-<summary><b>Will this break my existing persistence.nvim keymaps?</b></summary>
+<summary><b>Will my existing persistence.nvim keymaps still work?</b></summary>
 
-No. With `patch_persistence = true` (default), this plugin mirrors its helpers
-onto `require("persistence")` so existing code keeps working.
+Yes. persistence.nvim is still loaded normally and its full runtime API
+(`.load`, `.save`, `.start`, `.stop`, `.list`, `.current`, `.last`, `.branch`,
+`.active`, …) keeps working exactly as before.
+
+This is **separate** from the [setup question above](#do-i-still-need-to-call-requirepersistencesetup):
+that one is about `setup()` *options*; this one is about the *runtime functions*
+you call from keymaps.
+
+This plugin makes two small additions to `require("persistence")`:
+
+| Method on `require("persistence")` | Upstream? | Effect |
+| --- | --- | --- |
+| `.select()`        | yes | **Upgraded** to the scope-aware / Snacks-capable picker. Existing `<leader>qs → persistence.select()` keymaps benefit automatically. |
+| `.load_file(path)` | no  | Added — forwards to `persistence_scope.load_file(path)`. Fills a gap in upstream's API (upstream's `.load()` takes no arguments). |
+
+No other upstream functions are touched. If you'd rather call this plugin
+directly, use `require("persistence_scope").select()` from your keymaps —
+it's the same function `.select` now points to.
 
 </details>
 

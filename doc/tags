@@ -8,7 +8,7 @@ persistence-scope-configuration	persistence-scope.txt	/*persistence-scope-config
 persistence-scope-contents	persistence-scope.txt	/*persistence-scope-contents*
 persistence-scope-installation	persistence-scope.txt	/*persistence-scope-installation*
 persistence-scope-overview	persistence-scope.txt	/*persistence-scope-overview*
-persistence-scope-patch-persistence-option	persistence-scope.txt	/*persistence-scope-patch-persistence-option*
+persistence-scope-integration	persistence-scope.txt	/*persistence-scope-integration*
 persistence-scope-picker-option	persistence-scope.txt	/*persistence-scope-picker-option*
 persistence-scope-provider-option	persistence-scope.txt	/*persistence-scope-provider-option*
 persistence-scope-providers	persistence-scope.txt	/*persistence-scope-providers*

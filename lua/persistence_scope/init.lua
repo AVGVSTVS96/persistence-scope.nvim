@@ -10,7 +10,6 @@ M.config = {
   base_dir = vim.fn.stdpath("state") .. "/sessions/",
   branch = true,
   recent_seconds = 4 * 60 * 60,
-  patch_persistence = true,
   snacks = {},
 }
 
@@ -198,8 +197,6 @@ function M.sessions(opts)
   return items
 end
 
-M.session_items = M.sessions
-
 function M.load_file(file)
   if not file or vim.fn.filereadable(file) == 0 then
     return false
@@ -291,31 +288,24 @@ local function create_commands()
   end, { force = true })
 end
 
-local function patch_persistence()
-  if not M.config.patch_persistence then
-    return
-  end
-
-  local persistence = require("persistence")
-  persistence.load_tmux_fallback = M.restore
-  persistence.select = M.select
-  persistence.load_file = M.load_file
-  persistence.session_items = M.sessions
-end
-
 function M.setup(opts)
   M.config = vim.tbl_deep_extend("force", M.config, opts or {})
   M.config.base_dir = base_dir()
   M.scope = providers.resolve(M.config.provider)
 
-  require("persistence").setup({
+  local persistence = require("persistence")
+  persistence.setup({
     dir = session_dir(),
     branch = M.config.branch,
     need = M.config.need,
   })
 
+  -- Upgrade persistence.select() to the scope-aware picker and add
+  -- persistence.load_file(path) for sourcing a specific session file.
+  persistence.select = M.select
+  persistence.load_file = M.load_file
+
   create_commands()
-  patch_persistence()
 end
 
 return M

@@ -90,7 +90,6 @@ Defaults:
     base_dir = vim.fn.stdpath("state") .. "/sessions/",
     branch = true,
     recent_seconds = 4 * 60 * 60,
-    patch_persistence = true,
     snacks = {},
   })
 <
@@ -142,15 +141,18 @@ restore opens the picker instead of guessing.
 <
 
 ------------------------------------------------------------------------------
-patch_persistence                    *persistence-scope-patch-persistence-option*
+persistence.nvim integration                  *persistence-scope-integration*
 
-Adds compatibility helpers to require("persistence"):
+This plugin always wires itself into require("persistence"):
+  * upgrades .select() to the scope-aware / Snacks-capable picker
+  * adds .load_file(path) to source a specific session file with proper
+    LoadPre/LoadPost events fired
 >
-  require("persistence").load_tmux_fallback()
   require("persistence").select()
   require("persistence").load_file(path)
-  require("persistence").session_items()
 <
+No other upstream functions are touched. You can equivalently call
+require("persistence_scope").select() / .load_file() directly.
 
 ------------------------------------------------------------------------------
 snacks                                        *persistence-scope-snacks-option*
