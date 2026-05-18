@@ -45,7 +45,7 @@ INSTALLATION                              *persistence-scope-installation*
 With lazy.nvim: >
 
     {
-      "avgvstvs96/persistence-scope.nvim",
+      "AVGVSTVS96/persistence-scope.nvim",
       dependencies = {
         "folke/persistence.nvim",
         "folke/snacks.nvim",

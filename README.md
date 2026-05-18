@@ -81,7 +81,7 @@ With [`lazy.nvim`](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
-  "avgvstvs96/persistence-scope.nvim",
+  "AVGVSTVS96/persistence-scope.nvim",
   dependencies = {
     "folke/persistence.nvim",
     "folke/snacks.nvim", -- optional, for the rich picker
@@ -103,7 +103,7 @@ With Neovim's native package manager (`vim.pack`, Neovim `>= 0.12`):
 vim.pack.add({
   { src = "https://github.com/folke/persistence.nvim" },
   { src = "https://github.com/folke/snacks.nvim" }, -- optional, for the rich picker
-  { src = "https://github.com/avgvstvs96/persistence-scope.nvim" },
+  { src = "https://github.com/AVGVSTVS96/persistence-scope.nvim" },
 })
 
 require("persistence_scope").setup({
@@ -350,7 +350,7 @@ instead:
 
 -- ✅ After
 {
-  "avgvstvs96/persistence-scope.nvim",
+  "AVGVSTVS96/persistence-scope.nvim",
   dependencies = { "folke/persistence.nvim" },
   opts = { branch = true, need = 1, provider = "tmux_window_name" },
 }
