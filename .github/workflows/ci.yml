@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  stylua:
+    name: stylua
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: JohnnyMorganz/stylua-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: latest
+          args: --check .
+
+  lint:
+    name: luacheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: "5.1"
+      - uses: leafo/gh-actions-luarocks@v4
+      - run: luarocks install luacheck
+      - run: luacheck lua plugin
+
+  smoke:
+    name: load (nvim ${{ matrix.nvim }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        nvim: ["v0.10.4", "stable", "nightly"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: persistence-scope.nvim
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.nvim }}
+      - name: Clone folke/persistence.nvim
+        run: git clone --depth=1 https://github.com/folke/persistence.nvim
+      - name: Headless smoke test
+        run: |
+          nvim --headless --noplugin -u NONE \
+            --cmd "set rtp+=persistence.nvim" \
+            --cmd "set rtp+=persistence-scope.nvim" \
+            --cmd "runtime plugin/persistence_scope.lua" \
+            -c "lua require('persistence_scope').setup({ provider = function() return nil end })" \
+            -c "lua assert(type(require('persistence_scope').restore) == 'function')" \
+            -c "checkhealth persistence_scope" \
+            -c "qa!"

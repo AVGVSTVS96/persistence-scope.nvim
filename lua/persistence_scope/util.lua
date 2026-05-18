@@ -4,9 +4,12 @@ local uv = vim.uv or vim.loop
 
 function M.join(...)
   local parts = { ... }
-  local path = table.concat(vim.tbl_filter(function(part)
-    return part and part ~= ""
-  end, parts), "/")
+  local path = table.concat(
+    vim.tbl_filter(function(part)
+      return part and part ~= ""
+    end, parts),
+    "/"
+  )
   return path:gsub("/+", "/")
 end
 
