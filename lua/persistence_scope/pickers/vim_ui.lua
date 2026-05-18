@@ -54,9 +54,12 @@ function M.select(items, opts, on_confirm)
       local branch = item.branch and pad("Branch: " .. item.branch, 26) or ""
       local count = item.buffers and #item.buffers or 0
       local buffers = pad(("%-4s Buffers: %s"):format(("[%d]"):format(count), item.buffer_summary or ""), 56)
-      return table.concat(vim.tbl_filter(function(part)
-        return part ~= ""
-      end, { age, scope, cwd, buffers, branch }), "  ")
+      return table.concat(
+        vim.tbl_filter(function(part)
+          return part ~= ""
+        end, { age, scope, cwd, buffers, branch }),
+        "  "
+      )
     end,
   }, function(item)
     if item then

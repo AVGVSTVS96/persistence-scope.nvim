@@ -72,11 +72,7 @@ function M.list(opts)
 
   for _, file in ipairs(util.glob_sessions(scope.base_dir())) do
     local item = M.item_from_file(file)
-    if
-      item
-      and (not wanted_cwd or item.cwd == wanted_cwd)
-      and (not wanted_scope or item.scope_dir == wanted_scope)
-    then
+    if item and (not wanted_cwd or item.cwd == wanted_cwd) and (not wanted_scope or item.scope_dir == wanted_scope) then
       items[#items + 1] = item
     end
   end
