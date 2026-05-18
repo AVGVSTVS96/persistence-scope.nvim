@@ -6,9 +6,11 @@ persistence-scope-branch-option	persistence-scope.txt	/*persistence-scope-branch
 persistence-scope-commands	persistence-scope.txt	/*persistence-scope-commands*
 persistence-scope-configuration	persistence-scope.txt	/*persistence-scope-configuration*
 persistence-scope-contents	persistence-scope.txt	/*persistence-scope-contents*
+persistence-scope-custom-provider	persistence-scope.txt	/*persistence-scope-custom-provider*
 persistence-scope-installation	persistence-scope.txt	/*persistence-scope-installation*
-persistence-scope-overview	persistence-scope.txt	/*persistence-scope-overview*
 persistence-scope-integration	persistence-scope.txt	/*persistence-scope-integration*
+persistence-scope-need-option	persistence-scope.txt	/*persistence-scope-need-option*
+persistence-scope-overview	persistence-scope.txt	/*persistence-scope-overview*
 persistence-scope-picker-option	persistence-scope.txt	/*persistence-scope-picker-option*
 persistence-scope-provider-option	persistence-scope.txt	/*persistence-scope-provider-option*
 persistence-scope-providers	persistence-scope.txt	/*persistence-scope-providers*
@@ -16,4 +18,9 @@ persistence-scope-recent-seconds-option	persistence-scope.txt	/*persistence-scop
 persistence-scope-requirements	persistence-scope.txt	/*persistence-scope-requirements*
 persistence-scope-restore	persistence-scope.txt	/*persistence-scope-restore*
 persistence-scope-snacks-option	persistence-scope.txt	/*persistence-scope-snacks-option*
+persistence-scope-troubleshooting	persistence-scope.txt	/*persistence-scope-troubleshooting*
 persistence-scope.nvim	persistence-scope.txt	/*persistence-scope.nvim*
+persistence_scope.load_file()	persistence-scope.txt	/*persistence_scope.load_file()*
+persistence_scope.restore()	persistence-scope.txt	/*persistence_scope.restore()*
+persistence_scope.select()	persistence-scope.txt	/*persistence_scope.select()*
+persistence_scope.sessions()	persistence-scope.txt	/*persistence_scope.sessions()*
