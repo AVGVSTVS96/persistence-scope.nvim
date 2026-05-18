@@ -25,13 +25,11 @@ local function format(item)
   ret[#ret + 1] = { " " }
   ret[#ret + 1] = { align(cwd_parent, 36, { truncate = true }), "Comment" }
 
-  if item.branch then
-    ret[#ret + 1] = { " " }
-    ret[#ret + 1] = { align(item.branch, 22, { truncate = true }), "Number" }
-  end
+  ret[#ret + 1] = { " " }
+  ret[#ret + 1] = { align(item.buffer_summary or "", 44, { truncate = true }), "Comment" }
 
   ret[#ret + 1] = { " " }
-  ret[#ret + 1] = { item.buffer_summary or "", "Comment" }
+  ret[#ret + 1] = { align(item.branch or "", 22, { truncate = true }), "Number" }
   return ret
 end
 

@@ -64,7 +64,7 @@ function M.reltime(ts)
   elseif seconds < 604800 then
     return ("%dd"):format(math.floor(seconds / 86400))
   end
-  return os.date("%Y-%m-%d", ts)
+  return os.date("%m/%d", ts)
 end
 
 function M.newest(items)
@@ -185,13 +185,23 @@ function M.buffer_summary(files)
   end
 
   local names = {}
-  for i = 1, math.min(#files, 3) do
-    names[#names + 1] = vim.fn.fnamemodify(files[i], ":t")
+  local seen = {}
+  for _, file in ipairs(files) do
+    local name = vim.fn.fnamemodify(file, ":t")
+    if name ~= "" and not seen[name] then
+      seen[name] = true
+      names[#names + 1] = name
+    end
   end
 
-  local summary = table.concat(names, ", ")
-  if #files > 3 then
-    summary = summary .. (" +%d"):format(#files - 3)
+  if #names == 0 then
+    return "no files"
+  end
+
+  local shown = vim.list_slice(names, 1, math.min(#names, 3))
+  local summary = table.concat(shown, ", ")
+  if #names > #shown then
+    summary = summary .. (" +%d"):format(#names - #shown)
   end
   return summary
 end
