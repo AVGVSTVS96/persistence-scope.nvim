@@ -52,7 +52,5 @@ jobs:
             --cmd "set rtp+=persistence.nvim" \
             --cmd "set rtp+=persistence-scope.nvim" \
             --cmd "runtime plugin/persistence_scope.lua" \
-            -c "lua require('persistence_scope').setup({ provider = function() return nil end })" \
-            -c "lua assert(type(require('persistence_scope').restore) == 'function')" \
-            -c "checkhealth persistence_scope" \
+            -c "luafile persistence-scope.nvim/tests/smoke.lua" \
             -c "qa!"

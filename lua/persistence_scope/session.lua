@@ -101,19 +101,72 @@ function M.load_file(file)
   return true
 end
 
+---Return items in `items` modified within `recent_seconds`.
+---@param items PersistenceScope.SessionItem[]
+---@return PersistenceScope.SessionItem[]
+function M.recent(items)
+  local now = os.time()
+  local window = config.options.recent_seconds
+  local out = {}
+  for _, item in ipairs(items) do
+    if now - item.mtime <= window then
+      out[#out + 1] = item
+    end
+  end
+  return out
+end
+
 ---Count how many items in `items` were modified within `recent_seconds`.
 ---@param items PersistenceScope.SessionItem[]
 ---@return integer
 function M.recent_count(items)
-  local now = os.time()
-  local window = config.options.recent_seconds
-  local count = 0
+  return #M.recent(items)
+end
+
+---Annotate items with `tier` + `is_recent` and sort in place.
+---
+---Tiers: 1 = in `recent_files`, 2 = scope+cwd match, 3 = scope match,
+---4 = other. Within a tier, newer mtime wins.
+---@param items PersistenceScope.SessionItem[]
+---@param opts? { recent_files?: table<string, boolean>, cwd?: string, scope_dir?: string }
+---@return PersistenceScope.SessionItem[]
+function M.sort_tiered(items, opts)
+  opts = opts or {}
+  local recent_files = opts.recent_files or {}
+  local cwd = opts.cwd or util.normalize(vim.fn.getcwd())
+  local scope_dir = opts.scope_dir
+  if scope_dir == nil then
+    scope_dir = scope.current and scope.current.dir or nil
+  end
+
   for _, item in ipairs(items) do
-    if now - item.mtime <= window then
-      count = count + 1
+    if recent_files[item.file] then
+      item.tier = 1
+      item.is_recent = true
+    else
+      item.is_recent = false
+      if scope_dir and item.scope_dir == scope_dir then
+        if cwd and item.cwd == cwd then
+          item.tier = 2
+        else
+          item.tier = 3
+        end
+      else
+        item.tier = 4
+      end
     end
   end
-  return count
+
+  table.sort(items, function(a, b)
+    if a.tier ~= b.tier then
+      return a.tier < b.tier
+    end
+    if a.mtime == b.mtime then
+      return a.file < b.file
+    end
+    return a.mtime > b.mtime
+  end)
+  return items
 end
 
 return M

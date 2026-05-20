@@ -46,6 +46,7 @@ and restoration.
 - [Requirements](#-requirements)
 - [Installation](#-installation)
 - [Quick Start](#-quick-start)
+- [How it integrates with persistence.nvim](#-how-it-integrates-with-persistencenvim)
 - [Commands](#-commands)
 - [Lua API](#-lua-api)
 - [Configuration](#%EF%B8%8F-configuration)
@@ -90,9 +91,11 @@ With [`lazy.nvim`](https://github.com/folke/lazy.nvim):
   opts = {
     provider = "tmux_window_name",
   },
+  -- Standard persistence.nvim keymaps — scope-aware after install.
   keys = {
-    { "<leader>qr", function() require("persistence_scope").restore() end, desc = "Restore session" },
-    { "<leader>qs", function() require("persistence_scope").select()  end, desc = "Select session" },
+    { "<leader>qs", function() require("persistence").load() end,                desc = "Restore session" },
+    { "<leader>qS", function() require("persistence").select() end,              desc = "Select session" },
+    { "<leader>ql", function() require("persistence").load({ last = true }) end, desc = "Restore last session" },
   },
 }
 ```
@@ -110,13 +113,18 @@ require("persistence_scope").setup({
   provider = "tmux_window_name",
 })
 
-vim.keymap.set("n", "<leader>qr", function()
-  require("persistence_scope").restore()
+-- Standard persistence.nvim keymaps — scope-aware after install.
+vim.keymap.set("n", "<leader>qs", function()
+  require("persistence").load()
 end, { desc = "Restore session" })
 
-vim.keymap.set("n", "<leader>qs", function()
-  require("persistence_scope").select()
+vim.keymap.set("n", "<leader>qS", function()
+  require("persistence").select()
 end, { desc = "Select session" })
+
+vim.keymap.set("n", "<leader>ql", function()
+  require("persistence").load({ last = true })
+end, { desc = "Restore last session" })
 ```
 
 >[!IMPORTANT]
@@ -139,6 +147,26 @@ end, { desc = "Select session" })
 
 That's it. Each tmux window now gets its own isolated neovim session, even when there are multiple instances of the same project CWD.
 
+## 🔗 How it integrates with persistence.nvim
+
+Existing `persistence.nvim` keymaps and dashboard "Restore Session"
+buttons keep working — they're now scope-aware.
+
+| `require("persistence")` method | What it does after install |
+| --- | --- |
+| `.load()`                            | Smart restore. Newest match for the current scope + cwd, or [tiered picker](#-restore-behavior) on ambiguity. |
+| `.load({ last = true })`             | Same as `.load()` but **ignores cwd** — newest match in the current scope across any cwd. |
+| `.select()`                          | Always opens the tiered picker. |
+| `.load_file(path)`                   | **New.** Source a specific session file with `PersistenceLoadPre` / `LoadPost` fired. |
+| `.last()` *(query)*                  | Returns newest in *current scope* (because `dir` is redirected). |
+| `.save` / `.start` / `.stop` / `.current` / `.list` / `.active` / `.branch` | Untouched. Work via the redirected `dir`. |
+
+> [!NOTE]
+> `<leader>ql` (`persistence.load({ last = true })`) now returns the
+> newest session in your *current scope* (any cwd) instead of the
+> globally newest. If the scope is empty, the picker opens over all
+> sessions.
+
 ## 🧭 Commands
 
 | Command | Description |
@@ -148,22 +176,27 @@ That's it. Each tmux window now gets its own isolated neovim session, even when 
 
 ## 🧩 Lua API
 
-```lua
-local ps = require("persistence_scope")
-
-ps.restore()                 -- smart restore (see Restore Behavior)
-ps.select(opts)              -- open the picker
-ps.sessions(opts)            -- list session items (filter by { cwd, scope_dir })
-ps.load_file(path)           -- source a session file and fire persistence events
-```
-
-This plugin also wires itself into `require("persistence")` so existing
-keymaps and dashboards benefit from scoping with no code changes:
+For everyday use, call `persistence.nvim` directly — it's scope-aware after
+install:
 
 ```lua
-require("persistence").select()        -- upgraded to the scope-aware picker
-require("persistence").load_file(path) -- added: source a specific session file
+require("persistence").load()                  -- smart restore (cwd + scope)
+require("persistence").load({ last = true })   -- newest in current scope (any cwd)
+require("persistence").select()                -- scope-aware picker
+require("persistence").load_file(path)         -- source a specific session file
 ```
+
+`persistence_scope`'s own namespace is just configuration + querying:
+
+```lua
+require("persistence_scope").setup(opts)       -- configure (lazy.nvim users pass `opts` instead)
+require("persistence_scope").sessions(opts)    -- list/filter session items
+require("persistence_scope").config            -- merged config (read-only)
+```
+
+`sessions(opts)` returns an array of items with `file`, `cwd`, `scope_label`,
+`scope_dir`, `branch`, `mtime`, `age`, `buffers`, `buffer_summary` — useful
+for custom dashboards or pickers.
 
 ## ⚙️ Configuration
 
@@ -251,23 +284,43 @@ require("persistence_scope").setup({
 
 ## 🧠 Restore Behavior
 
-`:PersistenceScopeRestore` walks this decision tree:
+Three entry points. Each drops one more filter than the previous:
+
+| Call | scope respected? | cwd respected? |
+| --- | :---: | :---: |
+| `persistence.load()`                | ✅ | ✅ |
+| `persistence.load({ last = true })` | ✅ | ❌ |
+| `persistence.select()`              | ❌ | ❌ |
+
+Decision tree for `.load()` and `.load({ last = true })`:
 
 ```text
-┌─ sessions for current cwd?
-│   ├─ in current scope?
-│   │   ├─ multiple modified within recent_seconds → 🟡 open picker (scope)
-│   │   └─ otherwise                                → ✅ load newest in scope
-│   └─ no match in current scope                    → 🟡 open picker (cwd, all scopes)
+┌─ run primary filter (scope+cwd for .load(), scope-only for .load({last=true}))
 │
-└─ no scope resolved?
-    ├─ exactly one cwd match                        → ✅ load it
-    ├─ multiple, with >1 recent                     → 🟡 open picker
-    └─ multiple, none recent                        → ✅ load newest
+├─ ≥ 2 matches modified within recent_seconds → 🟡 tiered picker
+│                                                  (recent items highlighted)
+├─ 1+ match, no recency conflict              → ✅ load newest match
+├─ 0 matches but disk has other sessions      → 🟡 tiered picker (no highlights)
+└─ 0 sessions on disk anywhere                → ✋ vim.notify, return false
 ```
 
-If nothing matches at all, you get a friendly `vim.notify` and no session is
-sourced.
+**Every picker shows the full session list, sorted by relevance:**
+
+1. 🟡 **Recent in active filter** *(triggered the picker)* — highlighted (`★` in vim.ui.select, bold accent in Snacks)
+2. **Same scope + same cwd**
+3. **Same scope**, different cwd
+4. **Different scope**
+
+Within a tier, newer mtime wins. `persistence.select()` uses the same
+sort with no highlights.
+
+### Customizing the highlight
+
+```lua
+vim.api.nvim_set_hl(0, "PersistenceScopeRecent", { fg = "#f5a97f", bold = true })
+```
+
+(Default: linked to `Special` + bold.)
 
 ## 🩺 Troubleshooting
 
@@ -361,24 +414,15 @@ instead:
 <details>
 <summary><b>Will my existing persistence.nvim keymaps still work?</b></summary>
 
-Yes. persistence.nvim is still loaded normally and its full runtime API
-(`.load`, `.save`, `.start`, `.stop`, `.list`, `.current`, `.last`, `.branch`,
-`.active`, …) keeps working exactly as before.
+Yes. The plugin's primary surface *is* upstream's API — see
+[How it integrates with persistence.nvim](#-how-it-integrates-with-persistencenvim)
+for the full mapping. Existing `<leader>qs` / `<leader>ql` / `<leader>qS`
+keymaps and dashboard "Restore Session" buttons become scope-aware
+automatically with no code changes.
 
 This is **separate** from the [setup question above](#do-i-still-need-to-call-requirepersistencesetup):
 that one is about `setup()` *options*; this one is about the *runtime functions*
 you call from keymaps.
-
-This plugin makes two small additions to `require("persistence")`:
-
-| Method on `require("persistence")` | Upstream? | Effect |
-| --- | --- | --- |
-| `.select()`        | yes | **Upgraded** to the scope-aware / Snacks-capable picker. Existing `<leader>qs → persistence.select()` keymaps benefit automatically. |
-| `.load_file(path)` | no  | Added — forwards to `persistence_scope.load_file(path)`. Fills a gap in upstream's API (upstream's `.load()` takes no arguments). |
-
-No other upstream functions are touched. If you'd rather call this plugin
-directly, use `require("persistence_scope").select()` from your keymaps —
-it's the same function `.select` now points to.
 
 </details>
 
@@ -394,10 +438,20 @@ README.
 <details>
 <summary><b>What's <code>recent_seconds</code> for?</b></summary>
 
-If you've been working in the same scope on multiple branches (or the same
-project from multiple panes) within a short window, picking the absolute newest
-session can be wrong. When more than one session was touched within
-`recent_seconds`, restore opens the picker instead of guessing.
+When more than one session in the current scope (or scope+cwd) was
+touched within this window, restore opens the
+[tiered picker](#-restore-behavior) with the recent items highlighted
+instead of guessing.
+
+</details>
+
+<details>
+<summary><b>Why does the picker show sessions from other scopes / directories?</b></summary>
+
+So you can reach any session in one click instead of canceling and
+pressing another keymap. The highlight on the date column marks the
+items that triggered the open. See [Restore Behavior](#-restore-behavior)
+for the full model.
 
 </details>
 

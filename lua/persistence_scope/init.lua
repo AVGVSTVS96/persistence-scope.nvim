@@ -57,9 +57,13 @@ function M.select(opts)
 end
 
 ---Smart restore. See |persistence-scope-restore|.
+---
+---Installed as `require("persistence").load` by setup(). Returns a boolean
+---where upstream's `.load()` returns nil — almost no caller checks it.
+---@param opts? { last?: boolean }
 ---@return boolean
-function M.restore()
-  return require("persistence_scope.restore").run(M.select)
+function M.restore(opts)
+  return require("persistence_scope.restore").run(M.select, opts)
 end
 
 -- Setup
@@ -87,6 +91,11 @@ local function create_commands()
   end, { desc = "Open the persistence-scope session picker", force = true })
 end
 
+-- Override with `:hi PersistenceScopeRecent ...` to taste.
+local function define_highlights()
+  vim.api.nvim_set_hl(0, "PersistenceScopeRecent", { link = "Special", bold = true, default = true })
+end
+
 ---Configure persistence-scope. Safe to call multiple times.
 ---@param opts? PersistenceScope.Config
 function M.setup(opts)
@@ -104,13 +113,13 @@ function M.setup(opts)
       need = M.config.need,
     })
 
-    -- Upgrade persistence.select() so existing keymaps & dashboards benefit
-    -- from scope-aware picking with no code changes, and expose load_file()
-    -- which upstream doesn't provide.
+    -- Upgrade upstream entry points so existing keymaps become scope-aware.
+    persistence.load = M.restore
     persistence.select = M.select
     persistence.load_file = M.load_file
   end
 
+  define_highlights()
   create_commands()
 end
 
