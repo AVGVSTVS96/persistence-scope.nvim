@@ -101,6 +101,9 @@ function M.decode_session_name(file)
     return nil, nil
   end
 
+  -- ~N collision suffix (git forbids '~' in branch names, so this is unambiguous).
+  name = name:gsub("~%d+$", "")
+
   local cwd_key, branch_key = name:match("^(.-)%%%%(.+)$")
   if not cwd_key then
     cwd_key = name

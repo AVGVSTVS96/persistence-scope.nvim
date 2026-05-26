@@ -4,6 +4,10 @@ local util = require("persistence_scope.util")
 
 local M = {}
 
+---Session file this instance owns; saves overwrite it instead of claiming a new ~N slot.
+---@type string?
+M.current_session_file = nil
+
 ---@class PersistenceScope.SessionItem
 ---@field file string             absolute path to the .vim session file
 ---@field session string          alias for `file` (compatibility with persistence.nvim items)
@@ -86,7 +90,7 @@ function M.list(opts)
   return items
 end
 
----Source a session file, firing the usual persistence Pre/Post events.
+---Source `file`, fire LoadPre/LoadPost, and claim it as this instance's session.
 ---@param file string
 ---@return boolean
 function M.load_file(file)
@@ -98,7 +102,37 @@ function M.load_file(file)
   persistence.fire("LoadPre")
   vim.cmd("silent! source " .. vim.fn.fnameescape(file))
   persistence.fire("LoadPost")
+  M.current_session_file = file
   return true
+end
+
+---Save path for the current (cwd, branch) triple: the loaded file if we own
+---it for this triple, else canonical, else the lowest unused `~N` slot.
+---Stops a fresh nvim from overwriting a session another instance left behind.
+---@return string
+function M.save_path()
+  local persistence = require("persistence")
+  local canonical = persistence.current()
+  local base = canonical:sub(1, -5) -- strip ".vim"
+
+  if M.current_session_file then
+    local cur = M.current_session_file
+    if cur == canonical or cur:match("^" .. vim.pesc(base) .. "~%d+%.vim$") then
+      return cur
+    end
+  end
+
+  if vim.fn.filereadable(canonical) == 0 then
+    return canonical
+  end
+  local n = 2
+  while true do
+    local candidate = ("%s~%d.vim"):format(base, n)
+    if vim.fn.filereadable(candidate) == 0 then
+      return candidate
+    end
+    n = n + 1
+  end
 end
 
 ---Return items in `items` modified within `recent_seconds`.

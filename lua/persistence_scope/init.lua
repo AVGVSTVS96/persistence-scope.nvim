@@ -1,15 +1,5 @@
--- persistence-scope.nvim
--- Scoped sessions for folke/persistence.nvim.
---
--- This module is the public API. The actual work lives in:
---   * persistence_scope.config   — defaults / merged options
---   * persistence_scope.scope    — current scope resolution
---   * persistence_scope.session  — session enumeration + load_file
---   * persistence_scope.restore  — restore() decision tree
---   * persistence_scope.pickers  — Snacks / vim.ui.select dispatch
---   * persistence_scope.health   — :checkhealth
---
--- All of these are lazy-required to keep startup cost minimal.
+-- Scoped sessions for folke/persistence.nvim. Submodules are lazy-required
+-- to keep startup cost minimal.
 
 local M = {}
 
@@ -117,6 +107,14 @@ function M.setup(opts)
     persistence.load = M.restore
     persistence.select = M.select
     persistence.load_file = M.load_file
+
+    -- Collision-safe save: fresh instances claim a new `~N` slot instead of overwriting.
+    local session = require("persistence_scope.session")
+    persistence.save = function()
+      local file = session.save_path()
+      session.current_session_file = file
+      vim.cmd("mks! " .. vim.fn.fnameescape(file))
+    end
   end
 
   define_highlights()
