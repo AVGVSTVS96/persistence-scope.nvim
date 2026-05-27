@@ -14,6 +14,14 @@ the v0.1.0 drop-in promise.
 
 ### Fixed
 
+- **Multiple sessions per scope + cwd + branch are now preserved.**
+  Previously, a fresh nvim instance overwrote the canonical session
+  file on quit, destroying whatever another instance had already saved
+  for the same triple. Each session a user works in now gets its own
+  file: canonical `<cwd>%%<branch>.vim` first, then `~2.vim`, `~3.vim`,
+  … An instance that loaded a session saves back to that file. All
+  variants show up in the picker, sorted by mtime. Deviates from
+  upstream's unconditional `mks! <current()>`.
 - `require("persistence").load()` is now patched to the scope-aware
   restore. v0.1.0 only patched `.select()`, so the stock `<leader>qs`
   keymap and dashboard restore buttons silently bypassed the plugin.

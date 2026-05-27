@@ -159,7 +159,8 @@ buttons keep working — they're now scope-aware.
 | `.select()`                          | Always opens the tiered picker. |
 | `.load_file(path)`                   | **New.** Source a specific session file with `PersistenceLoadPre` / `LoadPost` fired. |
 | `.last()` *(query)*                  | Returns newest in *current scope* (because `dir` is redirected). |
-| `.save` / `.start` / `.stop` / `.current` / `.list` / `.active` / `.branch` | Untouched. Work via the redirected `dir`. |
+| `.save()`                            | Saves each instance's session to its own file even when scope + cwd + branch all match. An instance that loaded a session saves back to it; a fresh one writes canonical first, then `~2.vim`, `~3.vim`, … |
+| `.start` / `.stop` / `.current` / `.list` / `.active` / `.branch` | Untouched. Work via the redirected `dir`. |
 
 > [!NOTE]
 > `<leader>ql` (`persistence.load({ last = true })`) now returns the
@@ -313,6 +314,11 @@ Decision tree for `.load()` and `.load({ last = true })`:
 
 Within a tier, newer mtime wins. `persistence.select()` uses the same
 sort with no highlights.
+
+> [!NOTE]
+> Multiple sessions can share the same scope + cwd + branch — each
+> instance gets its own file (canonical first, then `~2.vim`, `~3.vim`,
+> …) and all variants show up in the picker, sorted by mtime.
 
 ### Customizing the highlight
 
