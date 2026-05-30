@@ -33,6 +33,18 @@ function M.run(select, opts)
     return true
   end, all)
 
+  -- Branch filter (not for last=true, which is branch-agnostic like upstream's
+  -- .last()). Prefer the current branch's sessions, fall back to branchless —
+  -- matching persistence.nvim's .load() fallback chain. Applied before the
+  -- recency check so a newer session on another branch can't trip a false
+  -- "ambiguous → picker".
+  if not opts.last then
+    local target = session.current_branch()
+    if target ~= false then
+      primary = session.branch_subset(primary, target)
+    end
+  end
+
   local recent = session.recent(primary)
 
   -- 2+ recent matches → picker with those items highlighted.

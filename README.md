@@ -154,7 +154,7 @@ buttons keep working — they're now scope-aware.
 
 | `require("persistence")` method | What it does after install |
 | --- | --- |
-| `.load()`                            | Smart restore. Newest match for the current scope + cwd, or [tiered picker](#-restore-behavior) on ambiguity. |
+| `.load()`                            | Smart restore. Newest match for the current scope + cwd + branch, or [tiered picker](#-restore-behavior) on ambiguity. |
 | `.load({ last = true })`             | Same as `.load()` but **ignores cwd** — newest match in the current scope across any cwd. |
 | `.select()`                          | Always opens the tiered picker. |
 | `.load_file(path)`                   | **New.** Source a specific session file with `PersistenceLoadPre` / `LoadPost` fired. |
@@ -287,16 +287,22 @@ require("persistence_scope").setup({
 
 Three entry points. Each drops one more filter than the previous:
 
-| Call | scope respected? | cwd respected? |
-| --- | :---: | :---: |
-| `persistence.load()`                | ✅ | ✅ |
-| `persistence.load({ last = true })` | ✅ | ❌ |
-| `persistence.select()`              | ❌ | ❌ |
+| Call | scope respected? | cwd respected? | branch respected? |
+| --- | :---: | :---: | :---: |
+| `persistence.load()`                | ✅ | ✅ | ✅ |
+| `persistence.load({ last = true })` | ✅ | ❌ | ❌ |
+| `persistence.select()`              | ❌ | ❌ | ❌ |
+
+For `.load()`, the primary filter is also **branch-aware**: it prefers the
+current git branch's sessions and falls back to branchless (`main`/`master`)
+sessions when none exist — matching `persistence.nvim`'s own restore fallback.
+`main`/`master` and non-git directories count as branchless. (`branch = false`
+disables this; `.load({ last = true })` is branch-agnostic by design.)
 
 Decision tree for `.load()` and `.load({ last = true })`:
 
 ```text
-┌─ run primary filter (scope+cwd for .load(), scope-only for .load({last=true}))
+┌─ run primary filter (scope+cwd[+branch] for .load(), scope-only for .load({last=true}))
 │
 ├─ ≥ 2 matches modified within recent_seconds → 🟡 tiered picker
 │                                                  (recent items highlighted)
@@ -308,9 +314,10 @@ Decision tree for `.load()` and `.load({ last = true })`:
 **Every picker shows the full session list, sorted by relevance:**
 
 1. 🟡 **Recent in active filter** *(triggered the picker)* — highlighted (`★` in vim.ui.select, bold accent in Snacks)
-2. **Same scope + same cwd**
-3. **Same scope**, different cwd
-4. **Different scope**
+2. **Same scope + same cwd + same branch**
+3. **Same scope + same cwd**, different branch
+4. **Same scope**, different cwd
+5. **Different scope**
 
 Within a tier, newer mtime wins. `persistence.select()` uses the same
 sort with no highlights.

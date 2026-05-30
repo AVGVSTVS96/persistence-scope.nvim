@@ -135,6 +135,53 @@ function M.save_path()
   end
 end
 
+---Current branch for restore matching, normalized to match how upstream
+---persistence.nvim names session files (it omits the suffix for main/master).
+---Reuses `persistence.branch()` so we detect the branch exactly the way the
+---saved filename was produced (same `.git`-in-cwd lookup).
+---  string → on a feature branch
+---  nil    → unbranched (main / master / not a git repo)
+---  false  → branch matching disabled (`branch = false`) or undeterminable
+---@return string|nil|false
+function M.current_branch()
+  if not config.options.branch then
+    return false
+  end
+  local ok, persistence = pcall(require, "persistence")
+  if not ok or type(persistence.branch) ~= "function" then
+    return false
+  end
+  local b = persistence.branch()
+  if b == "" or b == "main" or b == "master" then
+    return nil
+  end
+  return b
+end
+
+---Narrow `items` to the branch upstream's `.load()` would restore: prefer the
+---current branch's files, fall back to branchless (canonical) files when none
+---exist. `target == nil` means unbranched — only branchless files match.
+---@param items PersistenceScope.SessionItem[]
+---@param target string|nil
+---@return PersistenceScope.SessionItem[]
+function M.branch_subset(items, target)
+  if target == nil then
+    return vim.tbl_filter(function(item)
+      return item.branch == nil
+    end, items)
+  end
+
+  local exact = vim.tbl_filter(function(item)
+    return item.branch == target
+  end, items)
+  if #exact > 0 then
+    return exact
+  end
+  return vim.tbl_filter(function(item)
+    return item.branch == nil
+  end, items)
+end
+
 ---Return items in `items` modified within `recent_seconds`.
 ---@param items PersistenceScope.SessionItem[]
 ---@return PersistenceScope.SessionItem[]
@@ -159,8 +206,10 @@ end
 
 ---Annotate items with `tier` + `is_recent` and sort in place.
 ---
----Tiers: 1 = in `recent_files`, 2 = scope+cwd match, 3 = scope match,
----4 = other. Within a tier, newer mtime wins.
+---Tiers: 1 = in `recent_files`, 2 = scope+cwd+branch match, 3 = scope+cwd
+---(other branch), 4 = scope match (other cwd), 5 = other. Within a tier, newer
+---mtime wins. When branch matching is off/undeterminable, tier 2 is never
+---assigned and the rest collapse to the old scope+cwd / scope / other order.
 ---@param items PersistenceScope.SessionItem[]
 ---@param opts? { recent_files?: table<string, boolean>, cwd?: string, scope_dir?: string }
 ---@return PersistenceScope.SessionItem[]
@@ -172,6 +221,7 @@ function M.sort_tiered(items, opts)
   if scope_dir == nil then
     scope_dir = scope.current and scope.current.dir or nil
   end
+  local branch = M.current_branch()
 
   for _, item in ipairs(items) do
     if recent_files[item.file] then
@@ -181,12 +231,16 @@ function M.sort_tiered(items, opts)
       item.is_recent = false
       if scope_dir and item.scope_dir == scope_dir then
         if cwd and item.cwd == cwd then
-          item.tier = 2
+          if branch ~= false and item.branch == branch then
+            item.tier = 2
+          else
+            item.tier = 3
+          end
         else
-          item.tier = 3
+          item.tier = 4
         end
       else
-        item.tier = 4
+        item.tier = 5
       end
     end
   end

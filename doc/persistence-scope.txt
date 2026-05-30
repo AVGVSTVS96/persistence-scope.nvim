@@ -185,7 +185,7 @@ persistence.nvim integration          *persistence-scope-integration*
 
 After setup(), these methods on `require("persistence")` are scope-aware:
 
-  .load()                  Smart restore (scope + cwd). See
+  .load()                  Smart restore (scope + cwd + branch). See
                            |persistence-scope-restore|.
   .load({ last = true })   Same as .load() but cwd is ignored.
   .select()                Always opens the tiered picker.
@@ -231,13 +231,19 @@ RESTORE BEHAVIOR                              *persistence-scope-restore*
 
 Three entry points. Each drops one more filter than the previous:
 
-  persistence.load()                cwd + scope respected
-  persistence.load({ last = true }) scope respected, cwd ignored
+  persistence.load()                cwd + scope + branch respected
+  persistence.load({ last = true }) scope respected, cwd + branch ignored
   persistence.select()              no filters
+
+For `.load()`, the primary filter is also branch-aware: it prefers the current
+git branch's sessions and falls back to branchless (main/master) sessions when
+none exist, matching persistence.nvim's own restore fallback. main/master and
+non-git directories count as branchless. `branch = false` disables this, and
+`.load({ last = true })` is branch-agnostic by design.
 
 Decision tree for `.load()` and `.load({ last = true })`: >
 
-    primary filter (scope+cwd for .load(), scope-only for .load({last=true}))
+    primary filter (scope+cwd[+branch] for .load(), scope-only for .load({last=true}))
         |
         +-- ≥ 2 matches modified within recent_seconds
         |       → tiered picker (recent items highlighted)
@@ -252,9 +258,10 @@ Decision tree for `.load()` and `.load({ last = true })`: >
 Every picker shows the full session list, sorted by relevance:
 
   1. Recent in active filter — highlighted via |PersistenceScopeRecent|
-  2. Same scope AND same cwd
-  3. Same scope, different cwd
-  4. Different scope
+  2. Same scope AND same cwd AND same branch
+  3. Same scope AND same cwd, different branch
+  4. Same scope, different cwd
+  5. Different scope
 
 Within a tier, newer mtime wins. `persistence.select()` uses the same
 sort with no highlights.
