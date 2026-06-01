@@ -22,8 +22,8 @@ review. They all collide on the same session file and clobber each other.
 
 `persistence-scope.nvim` fixes that by adding a **scope** to the session path.
 By default it uses the current tmux window name; each Neovim instance gets its
-own isolated session scoped to its tmux window name for automatic persistence
-and restoration.
+own isolated session scoped to its tmux window name — autosaved on exit and
+restored on demand from that same window.
 
 ```text
 ~/.local/state/nvim/sessions/
@@ -87,7 +87,7 @@ With [`lazy.nvim`](https://github.com/folke/lazy.nvim):
     "folke/persistence.nvim",
     "folke/snacks.nvim", -- optional, for the rich picker
   },
-  lazy = false, -- load eagerly so sessions restore on startup
+  lazy = false, -- load eagerly so autosave + scope-aware restore keymaps work
   opts = {
     provider = "tmux_window_name",
   },
@@ -142,10 +142,25 @@ end, { desc = "Restore last session" })
 
 2. Open Neovim in any project from those windows and work normally.
 
-3. Re-open Neovim from the same window — your session restores automatically
-   via `:PersistenceScopeRestore` (or trigger it from a dashboard / keymap).
+3. Re-open Neovim from the same window, then trigger your normal persistence
+   restore — the `:PersistenceScopeRestore` command, your `<leader>qs` keymap,
+   or a dashboard "Restore Session" action. The session for that window loads.
 
 That's it. Each tmux window now gets its own isolated neovim session, even when there are multiple instances of the same project CWD.
+
+> [!TIP]
+> Prefer restoring on startup without a keypress? Add an opt-in autocmd —
+> but note many users dislike unconditional startup restores:
+>
+> ```lua
+> vim.api.nvim_create_autocmd("VimEnter", {
+>   nested = true,
+>   callback = function()
+>     -- only when nvim was started without file args
+>     if vim.fn.argc() == 0 then require("persistence").load() end
+>   end,
+> })
+> ```
 
 ## 🔗 How it integrates with persistence.nvim
 
@@ -294,10 +309,11 @@ Three entry points. Each drops one more filter than the previous:
 | `persistence.select()`              | ❌ | ❌ | ❌ |
 
 For `.load()`, the primary filter is also **branch-aware**: it prefers the
-current git branch's sessions and falls back to branchless (`main`/`master`)
-sessions when none exist — matching `persistence.nvim`'s own restore fallback.
-`main`/`master` and non-git directories count as branchless. (`branch = false`
-disables this; `.load({ last = true })` is branch-agnostic by design.)
+current git branch's sessions, but when none exist it keeps sessions from every
+branch as candidates rather than excluding them. `main`/`master` and non-git
+directories count as branchless and prefer branchless sessions, with the same
+fallback. (`branch = false` disables this; `.load({ last = true })` is
+branch-agnostic by design.)
 
 Decision tree for `.load()` and `.load({ last = true })`:
 

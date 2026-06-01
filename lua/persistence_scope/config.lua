@@ -44,10 +44,16 @@ M.defaults = {
 ---@type PersistenceScope.Config
 M.options = vim.deepcopy(M.defaults)
 
+---Whether setup() has run. `M.options` is a deepcopy of defaults, so identity
+---comparison can't tell "configured" from "untouched" — track it explicitly.
+---@type boolean
+M.did_setup = false
+
 local util = require("persistence_scope.util")
 
 ---@param opts table?
 function M.setup(opts)
+  M.did_setup = true
   M.options = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts or {})
   M.options.base_dir = util.with_slash(M.options.base_dir)
   return M.options

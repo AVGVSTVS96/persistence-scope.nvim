@@ -220,7 +220,7 @@ Custom providers return a scope table: >
       return {
         kind  = "custom",       -- identifier for the provider
         label = "my-scope",     -- shown in the picker
-        dir   = "custom-my-scope", -- subdirectory under base_dir
+        dir   = "custom-my-scope", -- folder name under base_dir; sanitized
         meta  = {},             -- arbitrary extra info
       }
     end
@@ -236,10 +236,11 @@ Three entry points. Each drops one more filter than the previous:
   persistence.select()              no filters
 
 For `.load()`, the primary filter is also branch-aware: it prefers the current
-git branch's sessions and falls back to branchless (main/master) sessions when
-none exist, matching persistence.nvim's own restore fallback. main/master and
-non-git directories count as branchless. `branch = false` disables this, and
-`.load({ last = true })` is branch-agnostic by design.
+git branch's sessions, but when none exist it keeps sessions from every branch
+as candidates rather than excluding them. main/master and non-git directories
+count as branchless and prefer branchless sessions, with the same fallback.
+`branch = false` disables this, and `.load({ last = true })` is branch-agnostic
+by design.
 
 Decision tree for `.load()` and `.load({ last = true })`: >
 
@@ -280,7 +281,7 @@ If scoping doesn't seem to be working:
 
 1. Confirm `:checkhealth` shows a non-`global` scope.
 2. Make sure nothing else in your config calls `require("persistence").setup()`
-   *after* this plugin — that will overwrite `dir` and silently break scoping.
+   after this plugin — that will overwrite `dir` and silently break scoping.
 3. Inspect the contents of `base_dir`: >
 
        :lua = require("persistence_scope").config.base_dir

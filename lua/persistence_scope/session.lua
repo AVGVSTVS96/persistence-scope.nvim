@@ -106,6 +106,21 @@ function M.load_file(file)
   return true
 end
 
+---Restore a picker-selected item. A pick can target any cwd, so chdir first
+---(like upstream `persistence.select()`); the file's own `cd` line is absent
+---when 'sessionoptions' omits curdir. Direct `.load()`/`.last()` skip this.
+---@param item PersistenceScope.SessionItem
+---@return boolean
+function M.load_item(item)
+  if not item then
+    return false
+  end
+  if item.cwd and item.cwd ~= "" then
+    vim.fn.chdir(item.cwd)
+  end
+  return M.load_file(item.file)
+end
+
 ---Save path for the current (cwd, branch) triple: the loaded file if we own
 ---it for this triple, else canonical, else the lowest unused `~N` slot.
 ---Stops a fresh nvim from overwriting a session another instance left behind.
@@ -158,28 +173,20 @@ function M.current_branch()
   return b
 end
 
----Narrow `items` to the branch upstream's `.load()` would restore: prefer the
----current branch's files, fall back to branchless (canonical) files when none
----exist. `target == nil` means unbranched — only branchless files match.
+---Prefer the current branch's sessions, but never exclude on a miss: when no
+---session matches `target`, every branch stays a candidate. `target == nil`
+---(main / master / non-git) prefers branchless files, same fallback to all.
 ---@param items PersistenceScope.SessionItem[]
 ---@param target string|nil
 ---@return PersistenceScope.SessionItem[]
 function M.branch_subset(items, target)
-  if target == nil then
-    return vim.tbl_filter(function(item)
-      return item.branch == nil
-    end, items)
-  end
-
   local exact = vim.tbl_filter(function(item)
     return item.branch == target
   end, items)
   if #exact > 0 then
     return exact
   end
-  return vim.tbl_filter(function(item)
-    return item.branch == nil
-  end, items)
+  return items
 end
 
 ---Return items in `items` modified within `recent_seconds`.

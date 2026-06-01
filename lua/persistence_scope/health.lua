@@ -34,10 +34,10 @@ function M.check()
   end
 
   local config = require("persistence_scope.config")
-  if config.options == config.defaults then
-    info("`require('persistence_scope').setup()` has not been called — using defaults")
-  else
+  if config.did_setup then
     ok("Configured")
+  else
+    info("`require('persistence_scope').setup()` has not been called — using defaults")
   end
 
   local scope = require("persistence_scope.scope")

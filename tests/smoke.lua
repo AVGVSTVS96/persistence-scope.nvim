@@ -53,6 +53,26 @@ local ok, err = pcall(function()
   -- :checkhealth must execute without errors.
   vim.cmd("checkhealth persistence_scope")
 
+  -- ── Provider dir sanitization ───────────────────────────────────────────
+  local providers = require("persistence_scope.providers")
+  local bad = providers.resolve(function()
+    return { kind = "custom", label = "feature/x", dir = "ws-../../etc/evil" }
+  end)
+  assert(bad.dir == "ws-.._.._etc_evil", "resolve() must flatten a path-like dir, got: " .. tostring(bad.dir))
+  assert(not bad.dir:find("[/\\]"), "sanitized dir must not contain path separators")
+
+  local from_label = providers.resolve(function()
+    return { kind = "custom", label = "team/api" }
+  end)
+  assert(
+    from_label.dir == "team_api",
+    "resolve() must derive+sanitize dir from label, got: " .. tostring(from_label.dir)
+  )
+
+  assert(providers.resolve(function()
+    return nil
+  end) == nil, "resolve() must pass through a nil scope unchanged")
+
   -- ── Multi-session save safety (v0.2.0) ──────────────────────────────────
   -- `branch = false` + tempdir cwd → deterministic filename encoding.
   -- Resetting `current_session_file` is the in-process stand-in for a fresh
@@ -167,32 +187,60 @@ local ok, err = pcall(function()
 
   local now = os.time()
 
-  -- Story 1: on feature-a, a newer feature-b session must NOT win.
+  local function clear_sessions()
+    for _, f in ipairs(vim.fn.glob(branch_sandbox .. "*.vim", false, true)) do
+      vim.fn.delete(f)
+    end
+  end
+
+  -- Story 1: an exact branch match wins over a newer session on another branch.
+  clear_sessions()
   local file_a = write_session("feature-a", now - 100)
-  write_session("feature-b", now) -- newer, wrong branch
+  write_session("feature-b", now) -- newer, different branch
   set_branch("feature-a")
-  restore_loads(file_a, "feature-a restore should load the feature-a session, not the newer feature-b")
+  restore_loads(file_a, "feature-a should load its own session, not the newer feature-b")
 
-  -- Story 3: on main, the branchless session wins; feature files are ignored.
-  local file_main = write_session(nil, now - 100)
-  set_branch("main")
-  restore_loads(file_main, "main restore should load the branchless session")
-
-  -- Story 2: on feature-c (no feature-c file), fall back to the branchless one.
+  -- Story 2: no session on the current branch → fall back to ALL branches, not
+  -- just branchless. Only a feature-b session exists, so feature-c loads it.
+  clear_sessions()
+  local file_b = write_session("feature-b", now - 100)
   set_branch("feature-c")
-  restore_loads(file_main, "feature-c with no own session should fall back to branchless")
+  restore_loads(file_b, "feature-c with no own/branchless session should fall back to feature-b")
 
-  -- Story 4: two recent feature-a sessions (canonical + ~2) open the picker
-  -- instead of auto-loading. vim.ui.select is stubbed to choose nil, so
+  -- Story 3: on main, the branchless session is preferred over feature sessions.
+  clear_sessions()
+  local file_main = write_session(nil, now)
+  write_session("feature-a", now) -- same age, different branch
+  set_branch("main")
+  restore_loads(file_main, "main should prefer the branchless session")
+
+  -- Story 4: on main with no branchless session → fall back to all branches.
+  clear_sessions()
+  local file_feat = write_session("feature-a", now - 100)
+  set_branch("main")
+  restore_loads(file_feat, "main with no branchless session should fall back to feature-a")
+
+  -- Story 5: ambiguous fall-back (2+ recent across branches, no exact match)
+  -- opens the picker instead of guessing. vim.ui.select is stubbed to nil, so
   -- current_session_file stays nil and restore() returns true (picker opened).
+  clear_sessions()
+  write_session("feature-a", now)
+  write_session("feature-b", now)
+  set_branch("feature-c")
+  session.current_session_file = nil
+  assert(persistence.load() == true, "ambiguous cross-branch fallback should open the picker (return true)")
+  assert(session.current_session_file == nil, "picker-open path must not auto-load a session")
+
+  -- Story 6: two recent sessions on the current branch (canonical + ~2) are
+  -- ambiguous → picker, even though the branch matches exactly.
+  clear_sessions()
+  write_session("feature-a", now)
   local file_a2 = branch_sandbox .. cwd_key .. "%%feature-a~2.vim"
   vim.fn.writefile({ "cd " .. vim.fn.fnameescape(branch_cwd) }, file_a2)
   uv.fs_utime(file_a2, now, now)
-  uv.fs_utime(file_a, now, now) -- make both recent
   set_branch("feature-a")
   session.current_session_file = nil
-  local opened = persistence.load()
-  assert(opened == true, "two recent same-branch sessions should open the picker (return true)")
+  assert(persistence.load() == true, "two recent same-branch sessions should open the picker")
   assert(session.current_session_file == nil, "picker-open path must not auto-load a session")
 end)
 

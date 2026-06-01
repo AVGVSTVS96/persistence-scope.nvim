@@ -42,7 +42,7 @@ function M.select(opts)
   end
 
   return require("persistence_scope.pickers").select(items, opts, function(item)
-    M.load_file(item.file)
+    require("persistence_scope.session").load_item(item)
   end)
 end
 

@@ -12,8 +12,10 @@ Three entry points, each dropping one filter:
 
 Branch matching applies to `.load()` only, when `branch = true`:
 
-- Prefers the current branch's sessions; falls back to branchless when none exist.
-- `main`, `master`, and non-git directories are branchless.
+- Prefers the current branch's sessions; when none match, every branch stays a
+  candidate (branch ranks matches, it never excludes them).
+- `main`, `master`, and non-git directories are branchless — they prefer
+  branchless sessions, with the same fall-back to all branches.
 - `branch = false`, or an undetectable branch, disables branch filtering —
   sessions with branch metadata stay eligible.
 

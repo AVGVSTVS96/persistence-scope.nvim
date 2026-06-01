@@ -1,3 +1,5 @@
+local util = require("persistence_scope.util")
+
 local M = {}
 
 local tmux = require("persistence_scope.providers.tmux")
@@ -11,16 +13,25 @@ local providers = {
 }
 
 function M.resolve(provider)
+  local scope
   if type(provider) == "function" then
-    return provider()
+    scope = provider()
+  else
+    local fn = providers[provider or "tmux_window_name"]
+    if not fn then
+      vim.notify(("Unknown persistence-scope provider: %s"):format(provider), vim.log.levels.WARN)
+      return nil
+    end
+    scope = fn()
   end
 
-  local fn = providers[provider or "tmux_window_name"]
-  if not fn then
-    vim.notify(("Unknown persistence-scope provider: %s"):format(provider), vim.log.levels.WARN)
+  if scope == nil then
     return nil
   end
-  return fn()
+
+  -- Custom providers can return any string; `dir` is used as a folder name.
+  scope.dir = util.sanitize(scope.dir or scope.label)
+  return scope
 end
 
 return M
