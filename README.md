@@ -234,8 +234,10 @@ require("persistence_scope").setup({
   -- is appended to this for the actual save location.
   base_dir = vim.fn.stdpath("state") .. "/sessions/",
 
-  -- Forwarded to persistence.nvim. When true, non-main branches get
-  -- their own session files.
+  -- Is the git branch a required match for autorestore? Sessions are always
+  -- saved per-branch and ranked by branch in the picker regardless.
+  --   true  → autorestore loads only the current branch (or branchless) session
+  --   false → falls back to any branch on a miss (diverges from persistence.nvim)
   branch = true,
 
   -- Forwarded to persistence.nvim. Minimum file buffers required for
@@ -309,11 +311,11 @@ Three entry points. Each drops one more filter than the previous:
 | `persistence.select()`              | ❌ | ❌ | ❌ |
 
 For `.load()`, the primary filter is also **branch-aware**: it prefers the
-current git branch's sessions, but when none exist it keeps sessions from every
-branch as candidates rather than excluding them. `main`/`master` and non-git
-directories count as branchless and prefer branchless sessions, with the same
-fallback. (`branch = false` disables this; `.load({ last = true })` is
-branch-agnostic by design.)
+current git branch's sessions. On a miss the fallback depends on `branch` — with
+`true` (default) it falls back to the branchless (`main`/`master`) session only,
+matching `persistence.nvim`; with `false` it falls back to a session on any
+branch. `main`/`master` and non-git directories count as branchless.
+(`.load({ last = true })` is branch-agnostic by design.)
 
 Decision tree for `.load()` and `.load({ last = true })`:
 

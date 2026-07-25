@@ -10,14 +10,15 @@ Three entry points, each dropping one filter:
 - `.load({ last = true })` — scope only (ignores cwd and branch).
 - `.select()` — unfiltered; any scope, cwd, or branch may be shown.
 
-Branch matching applies to `.load()` only, when `branch = true`:
+Branch matching applies to `.load()` autorestore only:
 
-- Prefers the current branch's sessions; when none match, every branch stays a
-  candidate (branch ranks matches, it never excludes them).
-- `main`, `master`, and non-git directories are branchless — they prefer
-  branchless sessions, with the same fall-back to all branches.
-- `branch = false`, or an undetectable branch, disables branch filtering —
-  sessions with branch metadata stay eligible.
+- Prefers the current branch's sessions. On a miss the fallback depends on the
+  `branch` option: `true` falls back to the branchless session only
+  (upstream-faithful); `false` falls back to a session on any branch — a
+  deliberate divergence from upstream.
+- `main`, `master`, non-git, and undetectable branches count as branchless.
+- Sessions are always saved per-branch and ranked by branch in the picker,
+  regardless of `branch`; the option governs autorestore strictness only.
 
 ## Ranking & fallback
 

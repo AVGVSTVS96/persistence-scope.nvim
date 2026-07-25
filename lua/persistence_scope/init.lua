@@ -99,7 +99,9 @@ function M.setup(opts)
   if persistence then
     persistence.setup({
       dir = scope.session_dir(),
-      branch = M.config.branch,
+      -- Always save per-branch; `config.branch` governs autorestore strictness,
+      -- not whether branches are recorded. The picker ranks by branch either way.
+      branch = true,
       need = M.config.need,
     })
 

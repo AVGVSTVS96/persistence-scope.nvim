@@ -150,21 +150,16 @@ function M.save_path()
   end
 end
 
----Current branch for restore matching, normalized to match how upstream
----persistence.nvim names session files (it omits the suffix for main/master).
----Reuses `persistence.branch()` so we detect the branch exactly the way the
----saved filename was produced (same `.git`-in-cwd lookup).
+---Current branch, normalized the way upstream names session files (the suffix
+---is omitted for main/master, so those read as branchless). `persistence.branch()`
+---reuses upstream's `.git`-in-cwd lookup, so detection matches the saved name.
 ---  string → on a feature branch
----  nil    → unbranched (main / master / not a git repo)
----  false  → branch matching disabled (`branch = false`) or undeterminable
----@return string|nil|false
+---  nil    → branchless (main / master / not a git repo / undeterminable)
+---@return string|nil
 function M.current_branch()
-  if not config.options.branch then
-    return false
-  end
   local ok, persistence = pcall(require, "persistence")
   if not ok or type(persistence.branch) ~= "function" then
-    return false
+    return nil
   end
   local b = persistence.branch()
   if b == "" or b == "main" or b == "master" then
@@ -173,9 +168,9 @@ function M.current_branch()
   return b
 end
 
----Prefer the current branch's sessions, but never exclude on a miss: when no
----session matches `target`, every branch stays a candidate. `target == nil`
----(main / master / non-git) prefers branchless files, same fallback to all.
+---Prefer sessions matching `target` (nil = branchless). The fallback on a miss
+---is governed by the `branch` option: `true` (upstream-faithful) keeps only
+---branchless files; `false` keeps every branch eligible for autorestore.
 ---@param items PersistenceScope.SessionItem[]
 ---@param target string|nil
 ---@return PersistenceScope.SessionItem[]
@@ -186,7 +181,12 @@ function M.branch_subset(items, target)
   if #exact > 0 then
     return exact
   end
-  return items
+  if config.options.branch == false then
+    return items
+  end
+  return vim.tbl_filter(function(item)
+    return item.branch == nil
+  end, items)
 end
 
 ---Return items in `items` modified within `recent_seconds`.
@@ -215,8 +215,8 @@ end
 ---
 ---Tiers: 1 = in `recent_files`, 2 = scope+cwd+branch match, 3 = scope+cwd
 ---(other branch), 4 = scope match (other cwd), 5 = other. Within a tier, newer
----mtime wins. When branch matching is off/undeterminable, tier 2 is never
----assigned and the rest collapse to the old scope+cwd / scope / other order.
+---mtime wins. Branch always ranks the picker, independent of the `branch`
+---option (which only governs autorestore strictness, not display).
 ---@param items PersistenceScope.SessionItem[]
 ---@param opts? { recent_files?: table<string, boolean>, cwd?: string, scope_dir?: string }
 ---@return PersistenceScope.SessionItem[]
@@ -238,7 +238,7 @@ function M.sort_tiered(items, opts)
       item.is_recent = false
       if scope_dir and item.scope_dir == scope_dir then
         if cwd and item.cwd == cwd then
-          if branch ~= false and item.branch == branch then
+          if item.branch == branch then
             item.tier = 2
           else
             item.tier = 3

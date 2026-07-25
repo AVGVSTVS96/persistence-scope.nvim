@@ -149,8 +149,12 @@ appended for the actual save location.
 ------------------------------------------------------------------------------
 branch                                  *persistence-scope-branch-option*
 
-Forwarded to persistence.nvim. When enabled, non-main branches get separate
-session files.
+Whether the git branch is a required match for autorestore. Sessions are always
+saved per-branch and ranked by branch in the picker regardless.
+    true   autorestore loads only the current branch's session, or the
+           branchless one — never another branch's. Mirrors persistence.nvim.
+    false  autorestore falls back to a session on any branch when the current
+           branch has none. A deliberate divergence from upstream.
 
 ------------------------------------------------------------------------------
 need                                      *persistence-scope-need-option*
@@ -236,11 +240,11 @@ Three entry points. Each drops one more filter than the previous:
   persistence.select()              no filters
 
 For `.load()`, the primary filter is also branch-aware: it prefers the current
-git branch's sessions, but when none exist it keeps sessions from every branch
-as candidates rather than excluding them. main/master and non-git directories
-count as branchless and prefer branchless sessions, with the same fallback.
-`branch = false` disables this, and `.load({ last = true })` is branch-agnostic
-by design.
+git branch's sessions. On a miss the fallback depends on `branch`: true
+(default) falls back to the branchless (main/master) session only, matching
+persistence.nvim; false falls back to a session on any branch. main/master and
+non-git directories count as branchless. `.load({ last = true })` is
+branch-agnostic by design.
 
 Decision tree for `.load()` and `.load({ last = true })`: >
 

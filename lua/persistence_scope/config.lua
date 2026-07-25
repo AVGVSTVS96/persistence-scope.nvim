@@ -25,8 +25,12 @@ M.defaults = {
   -- Base directory for all session files. The scope's directory is appended.
   base_dir = vim.fn.stdpath("state") .. "/sessions/",
 
-  -- Forwarded to persistence.nvim. When true, non-main branches get
-  -- their own session files.
+  -- Whether the git branch is a *required* match for autorestore. Sessions are
+  -- always saved per-branch and ranked by branch in the picker regardless.
+  --   true  → autorestore loads only the current branch's session, or the
+  --           branchless one — never another branch's. Mirrors persistence.nvim.
+  --   false → autorestore falls back to a session on any branch when the
+  --           current branch has none. A deliberate divergence from upstream.
   branch = true,
 
   -- Forwarded to persistence.nvim. Minimum number of file buffers required

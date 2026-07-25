@@ -33,16 +33,13 @@ function M.run(select, opts)
     return true
   end, all)
 
-  -- Branch preference (skipped for last=true, branch-agnostic like upstream's
-  -- .last()). Prefer the current branch's sessions; when none exist, every
-  -- branch stays a candidate. Applied before the recency check so a single
-  -- recent session on the current branch wins outright over newer ones
-  -- elsewhere.
+  -- Prefer the current branch's sessions (skipped for last=true, which is
+  -- branch-agnostic like upstream's .last()). On a miss, `branch = true` keeps
+  -- only branchless candidates (upstream); `branch = false` keeps every branch.
+  -- Applied before the recency check so a single recent session on the current
+  -- branch wins outright over newer ones elsewhere.
   if not opts.last then
-    local target = session.current_branch()
-    if target ~= false then
-      primary = session.branch_subset(primary, target)
-    end
+    primary = session.branch_subset(primary, session.current_branch())
   end
 
   local recent = session.recent(primary)
