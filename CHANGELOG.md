@@ -7,10 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] — 2026-05-18
+## [0.2.0] — 2026-07-24
 
-Unified picker model with recency highlighting, plus a critical fix to
-the v0.1.0 drop-in promise.
+Unified picker model with recency highlighting, branch-aware restore,
+plus a critical fix to the v0.1.0 drop-in promise.
 
 ### Fixed
 
@@ -29,6 +29,15 @@ the v0.1.0 drop-in promise.
 
 ### Added
 
+- **Branch-aware restore.** Sessions are always saved per-branch and
+  ranked by branch in the picker. `.load()` prefers the current
+  branch's sessions; on a miss the `branch` option governs the
+  fallback: `true` (default) falls back to the branchless
+  (`main`/`master`) session only, matching `persistence.nvim`;
+  `false` falls back to a session on any branch. `.load({ last =
+  true })` stays branch-agnostic by design.
+- **`CONTRACTS.md`** documenting the behavioral contract: entry-point
+  filters, branch matching, ranking tiers, and multi-session rules.
 - **Unified tiered picker.** Every picker shows the full session list
   sorted by relevance (recent → scope+cwd → scope → other), with the
   items that triggered the picker visually flagged.
