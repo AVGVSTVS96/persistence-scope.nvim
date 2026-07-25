@@ -4,6 +4,10 @@ local util = require("persistence_scope.util")
 
 local M = {}
 
+---Session file this instance owns; saves overwrite it instead of claiming a new ~N slot.
+---@type string?
+M.current_session_file = nil
+
 ---@class PersistenceScope.SessionItem
 ---@field file string             absolute path to the .vim session file
 ---@field session string          alias for `file` (compatibility with persistence.nvim items)
@@ -86,7 +90,7 @@ function M.list(opts)
   return items
 end
 
----Source a session file, firing the usual persistence Pre/Post events.
+---Source `file`, fire LoadPre/LoadPost, and claim it as this instance's session.
 ---@param file string
 ---@return boolean
 function M.load_file(file)
@@ -98,22 +102,166 @@ function M.load_file(file)
   persistence.fire("LoadPre")
   vim.cmd("silent! source " .. vim.fn.fnameescape(file))
   persistence.fire("LoadPost")
+  M.current_session_file = file
   return true
+end
+
+---Restore a picker-selected item. A pick can target any cwd, so chdir first
+---(like upstream `persistence.select()`); the file's own `cd` line is absent
+---when 'sessionoptions' omits curdir. Direct `.load()`/`.last()` skip this.
+---@param item PersistenceScope.SessionItem
+---@return boolean
+function M.load_item(item)
+  if not item then
+    return false
+  end
+  if item.cwd and item.cwd ~= "" then
+    vim.fn.chdir(item.cwd)
+  end
+  return M.load_file(item.file)
+end
+
+---Save path for the current (cwd, branch) triple: the loaded file if we own
+---it for this triple, else canonical, else the lowest unused `~N` slot.
+---Stops a fresh nvim from overwriting a session another instance left behind.
+---@return string
+function M.save_path()
+  local persistence = require("persistence")
+  local canonical = persistence.current()
+  local base = canonical:sub(1, -5) -- strip ".vim"
+
+  if M.current_session_file then
+    local cur = M.current_session_file
+    if cur == canonical or cur:match("^" .. vim.pesc(base) .. "~%d+%.vim$") then
+      return cur
+    end
+  end
+
+  if vim.fn.filereadable(canonical) == 0 then
+    return canonical
+  end
+  local n = 2
+  while true do
+    local candidate = ("%s~%d.vim"):format(base, n)
+    if vim.fn.filereadable(candidate) == 0 then
+      return candidate
+    end
+    n = n + 1
+  end
+end
+
+---Current branch, normalized the way upstream names session files (the suffix
+---is omitted for main/master, so those read as branchless). `persistence.branch()`
+---reuses upstream's `.git`-in-cwd lookup, so detection matches the saved name.
+---  string → on a feature branch
+---  nil    → branchless (main / master / not a git repo / undeterminable)
+---@return string|nil
+function M.current_branch()
+  local ok, persistence = pcall(require, "persistence")
+  if not ok or type(persistence.branch) ~= "function" then
+    return nil
+  end
+  local b = persistence.branch()
+  if b == "" or b == "main" or b == "master" then
+    return nil
+  end
+  return b
+end
+
+---Prefer sessions matching `target` (nil = branchless). The fallback on a miss
+---is governed by the `branch` option: `true` (upstream-faithful) keeps only
+---branchless files; `false` keeps every branch eligible for autorestore.
+---@param items PersistenceScope.SessionItem[]
+---@param target string|nil
+---@return PersistenceScope.SessionItem[]
+function M.branch_subset(items, target)
+  local exact = vim.tbl_filter(function(item)
+    return item.branch == target
+  end, items)
+  if #exact > 0 then
+    return exact
+  end
+  if config.options.branch == false then
+    return items
+  end
+  return vim.tbl_filter(function(item)
+    return item.branch == nil
+  end, items)
+end
+
+---Return items in `items` modified within `recent_seconds`.
+---@param items PersistenceScope.SessionItem[]
+---@return PersistenceScope.SessionItem[]
+function M.recent(items)
+  local now = os.time()
+  local window = config.options.recent_seconds
+  local out = {}
+  for _, item in ipairs(items) do
+    if now - item.mtime <= window then
+      out[#out + 1] = item
+    end
+  end
+  return out
 end
 
 ---Count how many items in `items` were modified within `recent_seconds`.
 ---@param items PersistenceScope.SessionItem[]
 ---@return integer
 function M.recent_count(items)
-  local now = os.time()
-  local window = config.options.recent_seconds
-  local count = 0
+  return #M.recent(items)
+end
+
+---Annotate items with `tier` + `is_recent` and sort in place.
+---
+---Tiers: 1 = in `recent_files`, 2 = scope+cwd+branch match, 3 = scope+cwd
+---(other branch), 4 = scope match (other cwd), 5 = other. Within a tier, newer
+---mtime wins. Branch always ranks the picker, independent of the `branch`
+---option (which only governs autorestore strictness, not display).
+---@param items PersistenceScope.SessionItem[]
+---@param opts? { recent_files?: table<string, boolean>, cwd?: string, scope_dir?: string }
+---@return PersistenceScope.SessionItem[]
+function M.sort_tiered(items, opts)
+  opts = opts or {}
+  local recent_files = opts.recent_files or {}
+  local cwd = opts.cwd or util.normalize(vim.fn.getcwd())
+  local scope_dir = opts.scope_dir
+  if scope_dir == nil then
+    scope_dir = scope.current and scope.current.dir or nil
+  end
+  local branch = M.current_branch()
+
   for _, item in ipairs(items) do
-    if now - item.mtime <= window then
-      count = count + 1
+    if recent_files[item.file] then
+      item.tier = 1
+      item.is_recent = true
+    else
+      item.is_recent = false
+      if scope_dir and item.scope_dir == scope_dir then
+        if cwd and item.cwd == cwd then
+          if item.branch == branch then
+            item.tier = 2
+          else
+            item.tier = 3
+          end
+        else
+          item.tier = 4
+        end
+      else
+        item.tier = 5
+      end
     end
   end
-  return count
+
+  table.sort(items, function(a, b)
+    if a.tier ~= b.tier then
+      return a.tier < b.tier
+    end
+    if a.mtime == b.mtime then
+      return a.file < b.file
+    end
+    return a.mtime > b.mtime
+  end)
+  return items
 end
 
 return M

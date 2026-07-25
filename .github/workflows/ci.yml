@@ -29,6 +29,25 @@ jobs:
       - run: luarocks install luacheck
       - run: luacheck lua plugin
 
+  helptags:
+    name: helptags
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: stable
+      - name: Regenerate helptags
+        run: nvim --headless -u NONE -c 'helptags doc' -c 'qa!'
+      - name: Fail if doc/tags is out of date
+        run: |
+          if ! git diff --quiet doc/tags; then
+            echo "::error::doc/tags is stale. Run: nvim --headless -u NONE -c 'helptags doc' -c 'qa!' and commit the result."
+            git diff doc/tags
+            exit 1
+          fi
+
   smoke:
     name: load (nvim ${{ matrix.nvim }})
     runs-on: ubuntu-latest
@@ -52,7 +71,5 @@ jobs:
             --cmd "set rtp+=persistence.nvim" \
             --cmd "set rtp+=persistence-scope.nvim" \
             --cmd "runtime plugin/persistence_scope.lua" \
-            -c "lua require('persistence_scope').setup({ provider = function() return nil end })" \
-            -c "lua assert(type(require('persistence_scope').restore) == 'function')" \
-            -c "checkhealth persistence_scope" \
+            -c "luafile persistence-scope.nvim/tests/smoke.lua" \
             -c "qa!"

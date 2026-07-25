@@ -149,9 +149,10 @@ local function format_row(item)
   local Snacks = require("snacks")
   local align = Snacks.picker.util.align
   local cwd = format_path(tail_path(item.cwd))
+  local age_hl = item.is_recent and "PersistenceScopeRecent" or "SnacksPickerTime"
 
   return {
-    { align(item.age or "", 7), "SnacksPickerTime" },
+    { align(item.age or "", 7), age_hl },
     { " " },
     { align(item.scope_label or "global", 24, { truncate = true }), "Identifier" },
     { " " },
@@ -191,7 +192,7 @@ function M.select(items, opts, on_confirm)
         end)
       end
     end,
-    sort = { fields = { "mtime:desc" } },
+    sort = { fields = { "tier", "mtime:desc" } },
   })
 
   return Snacks.picker(picker_opts)

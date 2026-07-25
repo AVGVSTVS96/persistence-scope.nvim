@@ -48,18 +48,20 @@ function M.select(items, opts, on_confirm)
   vim.ui.select(items, {
     prompt = opts.title or "Select Session",
     format_item = function(item)
+      local marker = item.is_recent and "★ " or "  "
       local age = pad(item.age or "", 6)
       local scope = pad(item.scope_label or "global", 19)
       local cwd = pad_left(tail_path(item.cwd or item.file), 24)
       local branch = item.branch and pad("Branch: " .. item.branch, 26) or ""
       local count = item.buffers and #item.buffers or 0
       local buffers = pad(("%-4s Buffers: %s"):format(("[%d]"):format(count), item.buffer_summary or ""), 56)
-      return table.concat(
-        vim.tbl_filter(function(part)
-          return part ~= ""
-        end, { age, scope, cwd, buffers, branch }),
-        "  "
-      )
+      return marker
+        .. table.concat(
+          vim.tbl_filter(function(part)
+            return part ~= ""
+          end, { age, scope, cwd, buffers, branch }),
+          "  "
+        )
     end,
   }, function(item)
     if item then

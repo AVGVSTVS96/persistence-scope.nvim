@@ -1,7 +1,11 @@
+local session = require("persistence_scope.session")
+
 local M = {}
 
 function M.select(items, opts, on_confirm)
   opts = opts or {}
+  session.sort_tiered(items, opts.sort_context)
+
   local picker = opts.picker or "auto"
 
   if picker == "auto" or picker == "snacks" then

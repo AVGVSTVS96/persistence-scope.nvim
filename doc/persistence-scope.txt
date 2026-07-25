@@ -74,34 +74,33 @@ COMMANDS                                       *persistence-scope-commands*
 ==============================================================================
 LUA API                                             *persistence-scope-api*
 
-                                                *persistence_scope.restore()*
-require("persistence_scope").restore()
-    Smart restore. See |persistence-scope-restore|.
+For everyday use, call persistence.nvim directly — it's scope-aware after
+install: >
 
-                                                 *persistence_scope.select()*
-require("persistence_scope").select({opts})
-    Open the session picker. Always opens, even when there is a single match.
-    {opts} may contain: >
-
-      {
-        items     = PersistenceScope.SessionItem[]?, -- pre-filtered items
-        title     = string?,                         -- picker title
-        picker    = "auto"|"snacks"|"vim_ui"?,       -- override for this call
-        snacks    = table?,                          -- extra Snacks options
-      }
+    require("persistence").load()                  -- smart restore (cwd + scope)
+    require("persistence").load({ last = true })   -- newest in current scope (any cwd)
+    require("persistence").select()                -- scope-aware picker
+    require("persistence").load_file(path)         -- source a specific file
 <
+
+See |persistence-scope-integration| for the full mapping. The two functions
+below are persistence_scope's own surface:
+
+                                                  *persistence_scope.setup()*
+require("persistence_scope").setup({opts})
+    Configure the plugin. See |persistence-scope-configuration|. Safe to call
+    multiple times. lazy.nvim users typically pass options via `opts` instead
+    of calling this directly.
 
                                                *persistence_scope.sessions()*
 require("persistence_scope").sessions({opts})
-    Return the list of session items, optionally filtered by {opts}: >
+    Return session items, optionally filtered by {opts}: >
 
       { cwd = string?, scope_dir = string? }
 <
-
-                                              *persistence_scope.load_file()*
-require("persistence_scope").load_file({path})
-    Source a specific session file. Fires `PersistenceLoadPre` and
-    `PersistenceLoadPost` so other plugins can hook into the restore.
+    Each item has `file`, `cwd`, `scope_label`, `scope_dir`, `branch`,
+    `mtime`, `age`, `buffers`, `buffer_summary` — useful for custom dashboards
+    or pickers.
 
 ==============================================================================
 CONFIGURATION                         *persistence-scope-configuration*
@@ -150,8 +149,12 @@ appended for the actual save location.
 ------------------------------------------------------------------------------
 branch                                  *persistence-scope-branch-option*
 
-Forwarded to persistence.nvim. When enabled, non-main branches get separate
-session files.
+Whether the git branch is a required match for autorestore. Sessions are always
+saved per-branch and ranked by branch in the picker regardless.
+    true   autorestore loads only the current branch's session, or the
+           branchless one — never another branch's. Mirrors persistence.nvim.
+    false  autorestore falls back to a session on any branch when the current
+           branch has none. A deliberate divergence from upstream.
 
 ------------------------------------------------------------------------------
 need                                      *persistence-scope-need-option*
@@ -162,8 +165,18 @@ autosave. `nil` uses the upstream default (1). Set to 0 to always save.
 ------------------------------------------------------------------------------
 recent_seconds                  *persistence-scope-recent-seconds-option*
 
-When more than one session for the current cwd and scope was modified
-recently, restore opens the picker instead of guessing.
+When more than one session in the call's primary filter was modified
+within this window (default: 4 hours), restore opens the tiered picker
+with the recent items highlighted instead of guessing.
+
+                                                *PersistenceScopeRecent*
+The Snacks picker highlights the date column of recent items via the
+|highlight-groups| `PersistenceScopeRecent` (linked to `Special` + bold).
+The |vim.ui.select| fallback uses a leading `★` prefix instead. >
+
+    vim.api.nvim_set_hl(0, "PersistenceScopeRecent",
+                        { fg = "#f5a97f", bold = true })
+<
 
 ------------------------------------------------------------------------------
 snacks                                  *persistence-scope-snacks-option*
@@ -174,13 +187,20 @@ Extra options forwarded to the Snacks picker. Any field accepted by
 ------------------------------------------------------------------------------
 persistence.nvim integration          *persistence-scope-integration*
 
-This plugin always wires itself into `require("persistence")`:
-  * upgrades `.select()` to the scope-aware / Snacks-capable picker
-  * adds `.load_file(path)` to source a specific session file with proper
-    LoadPre/LoadPost events fired
+After setup(), these methods on `require("persistence")` are scope-aware:
 
-No other upstream functions are touched. You can equivalently call
-`require("persistence_scope").select()` / `.load_file()` directly.
+  .load()                  Smart restore (scope + cwd + branch). See
+                           |persistence-scope-restore|.
+  .load({ last = true })   Same as .load() but cwd is ignored.
+  .select()                Always opens the tiered picker.
+  .load_file(path)         NEW — source a specific session file with
+                           PersistenceLoadPre / LoadPost fired.
+  .last()                  Returns newest in CURRENT SCOPE (because
+                           `dir` is redirected).
+
+Existing `<leader>qs` / `<leader>ql` / `<leader>qS` keymaps and dashboard
+"Restore Session" buttons become scope-aware automatically. Everything
+else on `require("persistence")` is untouched.
 
 ==============================================================================
 PROVIDERS                                     *persistence-scope-providers*
@@ -204,7 +224,7 @@ Custom providers return a scope table: >
       return {
         kind  = "custom",       -- identifier for the provider
         label = "my-scope",     -- shown in the picker
-        dir   = "custom-my-scope", -- subdirectory under base_dir
+        dir   = "custom-my-scope", -- folder name under base_dir; sanitized
         meta  = {},             -- arbitrary extra info
       }
     end
@@ -213,17 +233,43 @@ Custom providers return a scope table: >
 ==============================================================================
 RESTORE BEHAVIOR                              *persistence-scope-restore*
 
-`:PersistenceScopeRestore` uses this order:
+Three entry points. Each drops one more filter than the previous:
 
-1. Find sessions for the current working directory.
-2. Prefer sessions in the current scope.
-3. If more than one current-scope session was modified within
-   `recent_seconds`, open the picker.
-4. Otherwise load the newest current-scope session.
-5. If no current-scope session exists, open a picker for the current working
-   directory across all scopes.
-6. Outside a resolved scope, load the only current-directory session or ask
-   when there are multiple.
+  persistence.load()                cwd + scope + branch respected
+  persistence.load({ last = true }) scope respected, cwd + branch ignored
+  persistence.select()              no filters
+
+For `.load()`, the primary filter is also branch-aware: it prefers the current
+git branch's sessions. On a miss the fallback depends on `branch`: true
+(default) falls back to the branchless (main/master) session only, matching
+persistence.nvim; false falls back to a session on any branch. main/master and
+non-git directories count as branchless. `.load({ last = true })` is
+branch-agnostic by design.
+
+Decision tree for `.load()` and `.load({ last = true })`: >
+
+    primary filter (scope+cwd[+branch] for .load(), scope-only for .load({last=true}))
+        |
+        +-- ≥ 2 matches modified within recent_seconds
+        |       → tiered picker (recent items highlighted)
+        +-- 1+ match, no recency conflict
+        |       → load newest match
+        +-- 0 matches but disk has other sessions
+        |       → tiered picker (no highlights)
+        └── 0 sessions on disk anywhere
+                → vim.notify, return false
+<
+
+Every picker shows the full session list, sorted by relevance:
+
+  1. Recent in active filter — highlighted via |PersistenceScopeRecent|
+  2. Same scope AND same cwd AND same branch
+  3. Same scope AND same cwd, different branch
+  4. Same scope, different cwd
+  5. Different scope
+
+Within a tier, newer mtime wins. `persistence.select()` uses the same
+sort with no highlights.
 
 ==============================================================================
 TROUBLESHOOTING                       *persistence-scope-troubleshooting*
@@ -239,7 +285,7 @@ If scoping doesn't seem to be working:
 
 1. Confirm `:checkhealth` shows a non-`global` scope.
 2. Make sure nothing else in your config calls `require("persistence").setup()`
-   *after* this plugin — that will overwrite `dir` and silently break scoping.
+   after this plugin — that will overwrite `dir` and silently break scoping.
 3. Inspect the contents of `base_dir`: >
 
        :lua = require("persistence_scope").config.base_dir

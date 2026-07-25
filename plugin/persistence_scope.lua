@@ -1,8 +1,4 @@
--- persistence-scope.nvim — bootstrap
---
--- User commands are defined here so they're discoverable even before
--- `require("persistence_scope").setup()` has been called. `setup()` will
--- replace them with the final (identical) handlers.
+-- Bootstrap user commands before setup() so they appear in :command completion.
 
 if vim.g.loaded_persistence_scope == 1 then
   return

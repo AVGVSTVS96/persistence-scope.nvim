@@ -1,5 +1,6 @@
 :PersistenceScopeRestore	persistence-scope.txt	/*:PersistenceScopeRestore*
 :PersistenceScopeSelect	persistence-scope.txt	/*:PersistenceScopeSelect*
+PersistenceScopeRecent	persistence-scope.txt	/*PersistenceScopeRecent*
 persistence-scope-api	persistence-scope.txt	/*persistence-scope-api*
 persistence-scope-base-dir-option	persistence-scope.txt	/*persistence-scope-base-dir-option*
 persistence-scope-branch-option	persistence-scope.txt	/*persistence-scope-branch-option*
@@ -20,7 +21,5 @@ persistence-scope-restore	persistence-scope.txt	/*persistence-scope-restore*
 persistence-scope-snacks-option	persistence-scope.txt	/*persistence-scope-snacks-option*
 persistence-scope-troubleshooting	persistence-scope.txt	/*persistence-scope-troubleshooting*
 persistence-scope.nvim	persistence-scope.txt	/*persistence-scope.nvim*
-persistence_scope.load_file()	persistence-scope.txt	/*persistence_scope.load_file()*
-persistence_scope.restore()	persistence-scope.txt	/*persistence_scope.restore()*
-persistence_scope.select()	persistence-scope.txt	/*persistence_scope.select()*
 persistence_scope.sessions()	persistence-scope.txt	/*persistence_scope.sessions()*
+persistence_scope.setup()	persistence-scope.txt	/*persistence_scope.setup()*

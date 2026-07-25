@@ -9,14 +9,12 @@ local info = vim.health.info or vim.health.report_info
 function M.check()
   start("persistence-scope.nvim")
 
-  -- Neovim version
   if vim.fn.has("nvim-0.10") == 1 then
     ok("Neovim >= 0.10")
   else
     error("Neovim 0.10+ is required (using " .. tostring(vim.version()) .. ")")
   end
 
-  -- persistence.nvim
   local has_persistence, persistence = pcall(require, "persistence")
   if has_persistence then
     ok("folke/persistence.nvim is installed")
@@ -28,7 +26,6 @@ function M.check()
     return
   end
 
-  -- Snacks (optional)
   local has_snacks = pcall(require, "snacks")
   if has_snacks then
     ok("folke/snacks.nvim is installed — rich picker enabled")
@@ -36,15 +33,13 @@ function M.check()
     info("folke/snacks.nvim is not installed — falling back to vim.ui.select")
   end
 
-  -- Setup called?
   local config = require("persistence_scope.config")
-  if config.options == config.defaults then
-    info("`require('persistence_scope').setup()` has not been called — using defaults")
-  else
+  if config.did_setup then
     ok("Configured")
+  else
+    info("`require('persistence_scope').setup()` has not been called — using defaults")
   end
 
-  -- Scope
   local scope = require("persistence_scope.scope")
   if scope.current then
     ok(("Scope resolved: %s (%s) → %s"):format(scope.current.label, scope.current.kind, scope.session_dir()))
@@ -53,14 +48,12 @@ function M.check()
     info(("Sessions directory: %s"):format(scope.session_dir()))
   end
 
-  -- tmux
   if vim.env.TMUX and vim.env.TMUX ~= "" then
     ok("Running inside tmux (" .. (vim.env.TMUX_PANE or "?") .. ")")
   else
     info("Not running inside tmux — built-in tmux providers will return nil")
   end
 
-  -- Existing sessions
   local util = require("persistence_scope.util")
   local files = util.glob_sessions(scope.base_dir())
   info(("Found %d session file(s) under %s"):format(#files, scope.base_dir()))
